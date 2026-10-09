@@ -1,10 +1,10 @@
-# AccessFix AI — G1 runtime evidence (current `main`)
+# AccessFix AI — G1 runtime evidence (source snapshot from `main`)
 
 ## Snapshot and interpretation
 
 - **Repository:** `ivan-agentic-labs/forgeworks-accessfix-ai`
-- **Revision under review:** `9051010fa29f0d10ac7b8bf342758474cfd1e1d5`
-- **Branch:** `main` (the revision was pushed to `origin/main`)
+- **Tested source snapshot:** `9051010fa29f0d10ac7b8bf342758474cfd1e1d5`
+- **Branch:** `main` at audit start; the later commit containing only these evidence documents is `65e927a02147054a223290ada5dd95bd456b45da`
 - **Evidence date:** 2026-10-09
 - **Scope:** synthetic MVP, static contract checks, and disposable PostgreSQL only. This record does **not** approve production use, real customer data, remote browser execution, GitHub writes, or G1-D/G1-E closure.
 
@@ -12,7 +12,7 @@
 
 ## Exact local commands and outcomes
 
-Executed from the repository root at the revision above:
+Executed from the repository root against the tested source snapshot above:
 
 | Exact command | Local outcome |
 |---|---|

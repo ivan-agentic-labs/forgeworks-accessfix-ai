@@ -1,6 +1,6 @@
 # G1 evidence index
 
-Evidence snapshot: [`docs/evidence/G1_RUNTIME_EVIDENCE.md`](../evidence/G1_RUNTIME_EVIDENCE.md), current `main` revision `9051010fa29f0d10ac7b8bf342758474cfd1e1d5`.
+Evidence snapshot: [`docs/evidence/G1_RUNTIME_EVIDENCE.md`](../evidence/G1_RUNTIME_EVIDENCE.md), tested source snapshot `9051010fa29f0d10ac7b8bf342758474cfd1e1d5` captured from `main` before the documentation-only evidence commit.
 
 ## Current partial evidence
 
