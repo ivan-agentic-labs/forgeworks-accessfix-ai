@@ -1,0 +1,25 @@
+name: G1 Contract Verification
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contract-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install verification tools
+        run: python -m pip install -r scripts/requirements-verification.txt
+      - name: Check bootstrap structure and sensitive content
+        run: python scripts/verify_bootstrap.py
+      - name: Check contract shape and event schema
+        run: python scripts/verify_contracts.py
+      - name: Independent OpenAPI semantic validation
+        run: python scripts/validate_openapi_independent.py

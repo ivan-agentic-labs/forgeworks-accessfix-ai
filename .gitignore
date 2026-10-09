@@ -1,0 +1,15 @@
+# credentials and local runtime files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+__pycache__/
+.pytest_cache/
+.venv/
+node_modules/
+.next/
+dist/
+build/
+*.log
+.DS_Store

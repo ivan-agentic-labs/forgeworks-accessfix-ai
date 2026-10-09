@@ -1,0 +1,20 @@
+[
+  {
+    "child": "retest_results",
+    "column": "proposal_id",
+    "parent": "fix_proposals",
+    "structural": "passed structural candidate checks"
+  },
+  {
+    "child": "retest_results",
+    "column": "scan_job_id",
+    "parent": "scan_jobs",
+    "structural": "passed structural candidate checks"
+  },
+  {
+    "child": "scan_targets",
+    "column": "site_id",
+    "parent": "sites",
+    "structural": "passed structural candidate checks"
+  }
+]

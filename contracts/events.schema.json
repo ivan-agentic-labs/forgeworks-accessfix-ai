@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.invalid/accessfix-ai/events/v1.schema.json",
+  "title": "AccessFix AI candidate typed domain events v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "event_type",
+        "event_version",
+        "tenant_id",
+        "aggregate_id",
+        "aggregate_version",
+        "occurred_at",
+        "correlation_id",
+        "payload"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "event_type": {
+          "const": "scan.completed"
+        },
+        "event_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "tenant_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregate_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregate_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlation_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "causation_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scan_id",
+            "site_id",
+            "ruleset_version",
+            "findings_count",
+            "coverage_status"
+          ],
+          "properties": {
+            "scan_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "site_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "ruleset_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "findings_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "coverage_status": {
+              "type": "string",
+              "enum": [
+                "AUTOMATED_ONLY",
+                "PARTIAL",
+                "FAILED"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "event_type",
+        "event_version",
+        "tenant_id",
+        "aggregate_id",
+        "aggregate_version",
+        "occurred_at",
+        "correlation_id",
+        "payload"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "event_type": {
+          "const": "fix.manual_reviewed"
+        },
+        "event_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "tenant_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregate_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregate_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlation_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "causation_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "proposal_id",
+            "review_id",
+            "reviewer_id",
+            "patch_sha256",
+            "decision"
+          ],
+          "properties": {
+            "proposal_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "review_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "reviewer_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "patch_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "APPROVED",
+                "REJECTED",
+                "REWORK_REQUIRED"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "event_type",
+        "event_version",
+        "tenant_id",
+        "aggregate_id",
+        "aggregate_version",
+        "occurred_at",
+        "correlation_id",
+        "payload"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "event_type": {
+          "const": "fix.publish_reconciliation_required"
+        },
+        "event_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "tenant_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregate_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregate_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlation_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "causation_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "proposal_id",
+            "effect_key",
+            "reason",
+            "lookup_marker"
+          ],
+          "properties": {
+            "proposal_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "effect_key": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "REMOTE_UNCERTAIN",
+                "TIMEOUT",
+                "PERMISSION_REVOKED"
+              ]
+            },
+            "lookup_marker": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  ]
+}
