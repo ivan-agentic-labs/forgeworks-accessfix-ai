@@ -1,10 +1,9 @@
 # G2 bootstrap status — 9 October 2026
 
-Owner: `ivan-agentic-labs`. Five independent private repositories are authorized.
-G1 owner design approval permits bootstrap; historical conditional review text remains baseline evidence. G1-E remains OPEN/BLOCKED until all required runtime evidence is accepted.
+Owner: `ivan-agentic-labs`. Five independent private repositories are authorized. The current-main evidence snapshot is recorded in [`docs/evidence/G1_RUNTIME_EVIDENCE.md`](../evidence/G1_RUNTIME_EVIDENCE.md) at revision `9051010fa29f0d10ac7b8bf342758474cfd1e1d5`.
 
-The independent OpenAPI validator and static contract/event checks passed locally on this snapshot. GitHub Actions, generated-client compilation, live PostgreSQL/RLS, identity and sandbox checks are NOT RUN here.
+The current main revision has successful GitHub Actions evidence for application CI, independent/static contract checks, an empty disposable PostgreSQL migration, and the non-owner two-tenant RLS negative test. Local synthetic API/UI, auth/tenant negative, worker-reliability, and artifact/integrity guard tests also pass. These are partial, scoped results: G1-D remains conditional/not signed and G1-E remains OPEN/BLOCKED until the required external and operational evidence is accepted.
 
-APIShield is the first implementation priority AFTER remote bootstrap and CI verification. No production deployment or customer data is authorized.
+Generated-client compilation, real IdP/OIDC session and CSRF tests, independent browser sandbox/egress testing, external storage, legal/domain/privacy/operations/cost signoff, production backup/restore, and other unavailable evidence remain NOT_RUN or BLOCKED. No production deployment or customer data is authorized.
 
 The PostgreSQL workflow uses an intentionally public, disposable localhost-only test password. This is not a production credential. Never reuse it outside the isolated test service.
