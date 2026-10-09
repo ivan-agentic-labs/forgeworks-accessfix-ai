@@ -168,18 +168,21 @@ class Store:
     def complete_scan(self, tenant: str, scan_id: str, lease_until: str | None = None) -> bool:
         fingerprint = hashlib.sha256(b"fixture.local:/main:img-alt").hexdigest()
         with self.lock, self.conn() as c:
+            if isinstance(c, sqlite3.Connection):
+                c.execute("BEGIN IMMEDIATE")
             row = c.execute("SELECT * FROM scans WHERE tenant_id=? AND id=?", (tenant, scan_id)).fetchone()
-            if not row or row["cancel_requested"]:
+            if not row or row["cancel_requested"] or row["status"] not in ("PENDING", "RUNNING"):
                 return False
             if lease_until is not None and row["lease_until"] != lease_until:
                 return False
             if row["timeout_at"] and row["timeout_at"] < now():
                 c.execute("UPDATE scans SET status='TIMED_OUT',last_error_code='WORKER_TIMEOUT',lease_until=NULL WHERE tenant_id=? AND id=? AND status='RUNNING'", (tenant, scan_id))
                 return False
-            c.execute("INSERT OR IGNORE INTO findings VALUES(?,?,?,?,?,?,?,?)", (tenant, str(uuid.uuid4()), scan_id, "image-alt", "SERIOUS", "img#hero", fingerprint, 1))
             lease_clause = " AND lease_until=?" if lease_until is not None else ""
             values = (tenant, scan_id, lease_until) if lease_until is not None else (tenant, scan_id)
             changed = c.execute(f"UPDATE scans SET status='SUCCEEDED',lease_until=NULL,timeout_at=NULL WHERE tenant_id=? AND id=? AND status IN ('PENDING','RUNNING'){lease_clause}", values).rowcount
+            if changed == 1:
+                c.execute("INSERT OR IGNORE INTO findings VALUES(?,?,?,?,?,?,?,?)", (tenant, str(uuid.uuid4()), scan_id, "image-alt", "SERIOUS", "img#hero", fingerprint, 1))
             return changed == 1
 
     def finish_scan(self, tenant: str, scan_id: str) -> None:
@@ -187,14 +190,18 @@ class Store:
 
     def fail_scan(self, tenant: str, scan_id: str, error_code: str, *, max_attempts: int = 3, lease_until: str | None = None) -> str:
         with self.lock, self.conn() as c:
+            if isinstance(c, sqlite3.Connection):
+                c.execute("BEGIN IMMEDIATE")
             row = c.execute("SELECT * FROM scans WHERE tenant_id=? AND id=?", (tenant, scan_id)).fetchone()
             if not row:
                 return "NOT_FOUND"
+            if lease_until is not None and row["lease_until"] != lease_until:
+                return "STALE_LEASE"
+            if row["status"] not in ("PENDING", "RUNNING"):
+                return row["status"]
             if row["cancel_requested"]:
                 c.execute("UPDATE scans SET status='CANCELLED',lease_until=NULL,last_error_code='CANCELLED' WHERE tenant_id=? AND id=?", (tenant, scan_id))
                 return "CANCELLED"
-            if lease_until is not None and row["lease_until"] != lease_until:
-                return "STALE_LEASE"
             terminal = int(row["attempt_count"] or 0) >= max_attempts
             lease_clause = " AND lease_until=?" if lease_until is not None else ""
             values = ("FAILED" if terminal else "PENDING", error_code, tenant, scan_id, lease_until) if lease_until is not None else ("FAILED" if terminal else "PENDING", error_code, tenant, scan_id)
@@ -242,6 +249,8 @@ class Store:
 
     def review(self, tenant: str, proposal_id: str, reviewer: str, patch: str, decision: str, manual: str, version: int):
         with self.lock, self.conn() as c:
+            if isinstance(c, sqlite3.Connection):
+                c.execute("BEGIN IMMEDIATE")
             row = c.execute("SELECT * FROM proposals WHERE tenant_id=? AND id=?", (tenant, proposal_id)).fetchone()
             if not row:
                 return None, "NOT_FOUND"
@@ -251,7 +260,9 @@ class Store:
                 return row, "DIGEST_MISMATCH"
             review_id = str(uuid.uuid4())
             status = "APPROVED" if decision == "approve" and manual == "passed" else "REJECTED"
+            changed = c.execute("UPDATE proposals SET status=?,version=version+1 WHERE tenant_id=? AND id=? AND version=? AND status='PENDING_REVIEW' AND retest_status='PASSED'", (status, tenant, proposal_id, version)).rowcount
+            if changed != 1:
+                return row, "STALE"
             c.execute("INSERT INTO reviews VALUES(?,?,?,?,?,?,?)", (tenant, review_id, proposal_id, reviewer, decision, manual, version))
-            c.execute("UPDATE proposals SET status=? WHERE tenant_id=? AND id=? AND version=? AND status='PENDING_REVIEW'", (status, tenant, proposal_id, version))
             return (review_id, status), "OK"
 

@@ -1,10 +1,51 @@
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from accessfix_ai.infrastructure.store import SITE, TENANT, Store
 from accessfix_ai.worker import ScanWorker, WorkerConfig
 
 REPO = "a" * 40
 POLICY = "policy-digest"
+
+
+def test_terminal_scan_cannot_create_findings_or_be_rewritten(tmp_path):
+    store = new_store(tmp_path)
+    scan = store.scan(TENANT, SITE, REPO, POLICY)
+    lease = store.claim_scan()
+    assert store.fail_scan(TENANT, scan["id"], "TEST_FAILURE", max_attempts=1, lease_until=lease["lease_until"]) == "FAILED"
+    assert not store.complete_scan(TENANT, scan["id"])
+    assert store.findings(TENANT, scan["id"]) == []
+    assert store.fail_scan(TENANT, scan["id"], "LATE_FAILURE") == "FAILED"
+    assert store.get_scan(TENANT, scan["id"])["last_error_code"] == "TEST_FAILURE"
+
+
+def test_stale_worker_cannot_consume_new_lease_cancellation(tmp_path):
+    store = new_store(tmp_path)
+    scan = store.scan(TENANT, SITE, REPO, POLICY)
+    old = store.claim_scan(lease_seconds=0.01)
+    time.sleep(0.03)
+    newer = store.claim_scan()
+    store.request_cancel(TENANT, scan["id"])
+    assert store.fail_scan(TENANT, scan["id"], "OLD", lease_until=old["lease_until"]) == "STALE_LEASE"
+    assert store.get_scan(TENANT, scan["id"])["lease_until"] == newer["lease_until"]
+    assert store.fail_scan(TENANT, scan["id"], "NEW", lease_until=newer["lease_until"]) == "CANCELLED"
+
+
+def test_independent_adapters_allow_exactly_one_review(tmp_path):
+    store = new_store(tmp_path)
+    scan = store.scan(TENANT, SITE, REPO, POLICY)
+    ScanWorker(store).run_once()
+    finding = store.findings(TENANT, scan["id"])[0]
+    proposal = store.proposal(TENANT, finding["id"], REPO, "patch")
+    assert store.retest(TENANT, proposal["id"], REPO, 1)[1] == "OK"
+    adapters = [Store(store.path), Store(store.path)]
+    def approve(index):
+        return adapters[index].review(TENANT, proposal["id"], f"reviewer-{index}", "patch", "approve", "passed", 2)[1]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(approve, range(2))) == ["OK", "STALE"]
+    assert store.proposal_get(TENANT, proposal["id"])["version"] == 3
+    with store.conn() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM reviews").fetchone()[0] == 1
 
 
 def new_store(tmp_path):
@@ -100,3 +141,4 @@ def test_stale_retest_revision_cancellation_and_timeout_bounds(tmp_path):
     retested, status = store.retest(TENANT, proposal["id"], "d" * 40, 1)
     assert status == "OK" and retested["version"] == 2
     assert store.retest(TENANT, proposal["id"], "d" * 40, 1)[1] == "STALE"
+
