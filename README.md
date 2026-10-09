@@ -1,10 +1,18 @@
 # AccessFix AI
 
-**Status: GitHub G2 bootstrap candidate. Not implemented, not deployed, not production-ready.**
+**Status: synthetic MVP milestone implemented and tested locally. Not deployed, not production-ready, and G1-E remains open.**
 
 Web accessibility analysis, code remediation proposals and measured retesting.
 
-This private repository contains the canonical G1 design and executable **verification scaffolding**, not functioning AI product code.
+The first executable slice verifies ownership using a development challenge, enforces a fail-closed target policy, runs a synthetic fixture scan through a local worker, stores findings, and supports human-review-bound proposals. Remote browser scanning and GitHub writes remain disabled.
+
+## MVP run and test
+```bash
+python -m pip install -e 'apps/api[test]'
+ACCESSFIX_SEED_FIXTURE=1 PYTHONPATH=apps/api/src uvicorn accessfix_ai.main:app --reload
+python -W error -m pytest tests/integration
+```
+The SQLite store, development issuer, and `fixture.local` are test-only. Automated findings are not WCAG certification. See `docs/evidence/MVP_CHECKPOINT.md`.
 
 ## Documents
 - Product scope: `docs/product/PRODUCT_SCOPE.md`

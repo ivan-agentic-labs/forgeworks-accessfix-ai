@@ -1,0 +1,10 @@
+-- AccessFix MVP disposable migration. The review-only FK addendum is intentionally excluded.
+CREATE TABLE IF NOT EXISTS tenants(id uuid PRIMARY KEY,slug text UNIQUE NOT NULL,status text NOT NULL);
+CREATE TABLE IF NOT EXISTS sites(tenant_id uuid NOT NULL,id uuid NOT NULL,canonical_origin text NOT NULL,repository_id uuid NOT NULL,verification_status text NOT NULL,verified_until timestamptz,PRIMARY KEY(tenant_id,id),UNIQUE(tenant_id,canonical_origin),FOREIGN KEY(tenant_id) REFERENCES tenants(id));
+CREATE TABLE IF NOT EXISTS verification_challenges(tenant_id uuid NOT NULL,id uuid NOT NULL,site_id uuid NOT NULL,token_sha256 char(64) NOT NULL,expires_at timestamptz NOT NULL,used_at timestamptz,PRIMARY KEY(tenant_id,id),FOREIGN KEY(tenant_id,site_id) REFERENCES sites(tenant_id,id));
+CREATE TABLE IF NOT EXISTS scan_jobs(tenant_id uuid NOT NULL,id uuid NOT NULL,site_id uuid NOT NULL,repo_commit_sha text NOT NULL,network_policy_sha256 char(64) NOT NULL,status text NOT NULL,budget_pages integer NOT NULL,PRIMARY KEY(tenant_id,id),FOREIGN KEY(tenant_id,site_id) REFERENCES sites(tenant_id,id));
+CREATE TABLE IF NOT EXISTS findings(tenant_id uuid NOT NULL,id uuid NOT NULL,scan_id uuid NOT NULL,rule_id text NOT NULL,selector text NOT NULL,fingerprint char(64) NOT NULL,severity text NOT NULL,PRIMARY KEY(tenant_id,id),UNIQUE(tenant_id,scan_id,fingerprint),FOREIGN KEY(tenant_id,scan_id) REFERENCES scan_jobs(tenant_id,id));
+ALTER TABLE sites ENABLE ROW LEVEL SECURITY; ALTER TABLE scan_jobs ENABLE ROW LEVEL SECURITY; ALTER TABLE findings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY sites_tenant ON sites USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
+CREATE POLICY scan_jobs_tenant ON scan_jobs USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
+CREATE POLICY findings_tenant ON findings USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
