@@ -30,6 +30,10 @@ Source: `65bc8f36e594e8f84b0b1b2403cee6b67e8ecd50`. This immutable receipt cover
 
 ### Continuation on 2026-10-09
 
+The local worker now reads bounded UTF-8 HTML fixture bytes and evaluates missing image-alt attributes, rather than inserting a hardcoded finding. Fingerprints bind the exact source digest, rule, image ordinal and raw opening tag. Duplicate image attributes, NUL, invalid UTF-8 and oversized/over-budget input fail closed. Unique safe IDs produce precise selectors; other images use a broad selector, not a fabricated source location. Empty alt is preserved as intentional decoration, not certified semantically correct.
+
+Still unfinished: persistent immutable source mappings, genuine repository-revision binding, owner-supplied patch bytes and actual patched-source retest. Existing fixture proposal/retest fields remain synthetic workflow scaffolding, not evidence that an accessibility repair works. Browser rendering, axe/WCAG checks and remote execution are not implemented by this static rule.
+
 Revision inputs accept exactly 40 or 64 hexadecimal characters, matching Git object ID formats; intermediate lengths are rejected. The fixture runner accepts exactly `["/"]`; other paths, query strings and duplicate root paths fail closed with `SCAN_SCOPE_UNSUPPORTED` before a job is created. This restriction is not a multi-page scanner implementation.
 
 Concurrent review decisions use a transactional compare-and-swap and increment the proposal version before inserting the winning review. Terminal scan completion cannot insert findings; stale failure callbacks cannot consume cancellation on a newer lease. These behaviors have independent-adapter regression tests. PostgreSQL concurrent review and logical restore passed at source `8eda3d2c95e50d55f64cfb6d238081318977e9fa` in [runtime proof](https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37923173580). Later commits require their own results.

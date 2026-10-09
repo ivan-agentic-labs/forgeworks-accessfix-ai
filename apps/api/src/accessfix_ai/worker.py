@@ -18,8 +18,9 @@ class ScanWorker:
     """One-shot worker loop for local fixture scans.
 
     The worker never performs network/browser I/O.  A processor may be injected by
-    tests, but production's default processor only writes deterministic fixture
-    findings through Store.complete_scan.
+    tests, but the default processor reads the bounded local HTML fixture and
+    evaluates the static missing-image-alt rule through Store.complete_scan.
+    This is not a rendered-browser accessibility audit.
     """
 
     def __init__(self, store: Store, config: WorkerConfig | None = None, processor: Callable[[dict], None] | None = None):

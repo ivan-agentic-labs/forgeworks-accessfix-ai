@@ -8,6 +8,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from accessfix_ai.domain.static_html import image_alt_findings, MAX_SOURCE_BYTES
+
 TENANT = "00000000-0000-0000-0000-000000000001"
 USER = "00000000-0000-0000-0000-000000000010"
 SITE = "22222222-2222-2222-2222-222222222222"
@@ -166,7 +168,6 @@ class Store:
             return c.execute("SELECT * FROM scans WHERE tenant_id=? AND id=?", (row["tenant_id"], row["id"])).fetchone()
 
     def complete_scan(self, tenant: str, scan_id: str, lease_until: str | None = None) -> bool:
-        fingerprint = hashlib.sha256(b"fixture.local:/main:img-alt").hexdigest()
         with self.lock, self.conn() as c:
             if isinstance(c, sqlite3.Connection):
                 c.execute("BEGIN IMMEDIATE")
@@ -178,11 +179,15 @@ class Store:
             if row["timeout_at"] and row["timeout_at"] < now():
                 c.execute("UPDATE scans SET status='TIMED_OUT',last_error_code='WORKER_TIMEOUT',lease_until=NULL WHERE tenant_id=? AND id=? AND status='RUNNING'", (tenant, scan_id))
                 return False
+            fixture = Path(__file__).resolve().parents[5] / "fixtures/golden/fixture.html"
+            with fixture.open("rb") as source:
+                findings = image_alt_findings(source.read(MAX_SOURCE_BYTES + 1))
             lease_clause = " AND lease_until=?" if lease_until is not None else ""
             values = (tenant, scan_id, lease_until) if lease_until is not None else (tenant, scan_id)
             changed = c.execute(f"UPDATE scans SET status='SUCCEEDED',lease_until=NULL,timeout_at=NULL WHERE tenant_id=? AND id=? AND status IN ('PENDING','RUNNING'){lease_clause}", values).rowcount
             if changed == 1:
-                c.execute("INSERT OR IGNORE INTO findings VALUES(?,?,?,?,?,?,?,?)", (tenant, str(uuid.uuid4()), scan_id, "image-alt", "SERIOUS", "img#hero", fingerprint, 1))
+                for finding in findings:
+                    c.execute("INSERT OR IGNORE INTO findings VALUES(?,?,?,?,?,?,?,?)", (tenant, str(uuid.uuid4()), scan_id, finding["rule_id"], finding["severity"], finding["selector"], finding["fingerprint"], finding["manual_required"]))
             return changed == 1
 
     def finish_scan(self, tenant: str, scan_id: str) -> None:
