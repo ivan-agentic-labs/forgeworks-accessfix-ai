@@ -76,9 +76,8 @@ def build_image_alt_patch(source: bytes, identifier: str, alt_text: str) -> dict
     if any(ord(c) < 32 or ord(c) == 127 for c in alt_text):
         raise ValueError("Control characters are not allowed in alternative text")
     text = source.decode("utf-8")
-    starts = [0]
-    for line in text.splitlines(keepends=True):
-        starts.append(starts[-1] + len(line))
+    # HTMLParser advances line numbers only at LF, not every Unicode separator.
+    starts = [0] + [index + 1 for index, char in enumerate(text) if char == "\n"]
     matches = []
 
     class TargetParser(HTMLParser):
@@ -107,5 +106,9 @@ def build_image_alt_patch(source: bytes, identifier: str, alt_text: str) -> dict
     before = image_alt_findings(source)
     if len(after) != len(before) - 1 or any(row["selector"] == "img#" + identifier for row in after):
         raise ValueError("Static retest did not remove exactly the target finding")
-    patch = "".join(difflib.unified_diff(text.splitlines(keepends=True), patched.decode("utf-8").splitlines(keepends=True), fromfile="a/source.html", tofile="b/source.html"))
+    def git_lines(value):
+        parts = value.split("\n")
+        return [part + "\n" for part in parts[:-1]] + ([parts[-1]] if parts[-1] else [])
+    lines = difflib.unified_diff(git_lines(text), git_lines(patched.decode("utf-8")), fromfile="a/source.html", tofile="b/source.html")
+    patch = "".join(line if line.endswith("\n") else line + "\n\\ No newline at end of file\n" for line in lines)
     return {"source_sha256": hashlib.sha256(source).hexdigest(), "patched_sha256": hashlib.sha256(patched).hexdigest(), "patch_sha256": hashlib.sha256(patch.encode()).hexdigest(), "patch": patch, "patched_source": patched, "static_retest": "PASSED", "remaining_findings": len(after)}

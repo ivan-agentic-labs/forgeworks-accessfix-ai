@@ -1,5 +1,14 @@
 import pytest
+import subprocess
 from accessfix_ai.domain.static_html import build_image_alt_patch, image_alt_findings
+
+
+def test_generated_patch_is_actually_applicable_with_no_final_newline(tmp_path):
+    source = b'<main>\r<img id="hero"></main>'
+    result = build_image_alt_patch(source, "hero", "Owner label")
+    (tmp_path / "source.html").write_bytes(source)
+    subprocess.run(["git", "apply", "--no-index", "-"], input=result["patch"].encode(), cwd=tmp_path, check=True, capture_output=True)
+    assert (tmp_path / "source.html").read_bytes() == result["patched_source"]
 
 
 def test_actual_patch_preserves_other_source_and_retests():
