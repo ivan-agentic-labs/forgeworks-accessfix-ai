@@ -304,7 +304,10 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
     @app.post("/v1/fix-proposals/{proposal_id}/retests", status_code=202)
     def retest(proposal_id: UUID, body: Retest, idempotency_key: Annotated[str | None, Header()] = None, c=Depends(scope("patch:create", store))):
-        result, status = store.retest(c["tenant_id"], str(proposal_id), body.repo_commit_sha, body.expected_version)
+        try:
+            result, status = store.retest(c["tenant_id"], str(proposal_id), body.repo_commit_sha, body.expected_version, principal=c["sub"], idempotency_key=idempotency_key)
+        except IdempotencyConflict as exc:
+            return problem(409, "IDEMPOTENCY_KEY_REUSED", str(exc))
         if status == "NOT_FOUND":
             return problem(404, "RESOURCE_NOT_FOUND", "Proposal is not visible")
         if status == "STALE":
@@ -326,10 +329,14 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
     def review(proposal_id: UUID, body: Review, idempotency_key: Annotated[str | None, Header()] = None, c=Depends(scope("patch:review", store))):
         if body.decision not in {"approve", "reject"} or body.manual_check_status not in {"passed", "failed", "not_applicable"}:
             return problem(400, "INVALID_REVIEW", "Review decision or manual status is invalid")
-        result, status = store.review(
-            c["tenant_id"], str(proposal_id), c["sub"], body.patch_sha256,
-            body.decision, body.manual_check_status, body.expected_version,
-        )
+        try:
+            result, status = store.review(
+                c["tenant_id"], str(proposal_id), c["sub"], body.patch_sha256,
+                body.decision, body.manual_check_status, body.expected_version,
+                idempotency_key=idempotency_key,
+            )
+        except IdempotencyConflict as exc:
+            return problem(409, "IDEMPOTENCY_KEY_REUSED", str(exc))
         if status == "NOT_FOUND":
             return problem(404, "RESOURCE_NOT_FOUND", "Proposal is not visible")
         if status == "STALE":

@@ -281,10 +281,17 @@ class Store:
         with self.conn() as c:
             return c.execute("SELECT * FROM proposals WHERE tenant_id=? AND id=?", (tenant, proposal_id)).fetchone()
 
-    def retest(self, tenant: str, proposal_id: str, commit_sha: str, expected_version: int):
+    def retest(self, tenant: str, proposal_id: str, commit_sha: str, expected_version: int, *, principal: str = "system", idempotency_key: str | None = None):
+        request_hash = hashlib.sha256(json.dumps([proposal_id, commit_sha, expected_version], separators=(",", ":")).encode()).hexdigest()
         with self.lock, self.conn() as c:
             if isinstance(c, sqlite3.Connection):
                 c.execute("BEGIN IMMEDIATE")
+            if idempotency_key:
+                command = c.execute("SELECT request_hash,resource_id FROM idempotency_keys WHERE tenant_id=? AND principal=? AND action='retest' AND key=?", (tenant, principal, idempotency_key)).fetchone()
+                if command:
+                    if command["request_hash"] != request_hash:
+                        raise IdempotencyConflict("Idempotency-Key was reused for a different retest request")
+                    return c.execute("SELECT * FROM proposals WHERE tenant_id=? AND id=?", (tenant, command["resource_id"])).fetchone(), "OK"
             row = c.execute("SELECT * FROM proposals WHERE tenant_id=? AND id=?", (tenant, proposal_id)).fetchone()
             if not row:
                 return None, "NOT_FOUND"
@@ -306,12 +313,24 @@ class Store:
             changed = c.execute("UPDATE proposals SET retest_status='PASSED',status='PENDING_REVIEW',version=version+1 WHERE tenant_id=? AND id=? AND version=? AND status='PENDING_RETEST'", (tenant, proposal_id, expected_version)).rowcount
             if not changed:
                 return row, "STALE"
+            if idempotency_key:
+                c.execute("INSERT INTO idempotency_keys VALUES(?,?,?,?,?,?,?)", (tenant, principal, "retest", idempotency_key, request_hash, proposal_id, 202))
         return self.proposal_get(tenant, proposal_id), "OK"
 
-    def review(self, tenant: str, proposal_id: str, reviewer: str, patch: str, decision: str, manual: str, version: int):
+    def review(self, tenant: str, proposal_id: str, reviewer: str, patch: str, decision: str, manual: str, version: int, *, idempotency_key: str | None = None):
+        request_hash = hashlib.sha256(json.dumps([proposal_id, reviewer, patch, decision, manual, version], separators=(",", ":")).encode()).hexdigest()
         with self.lock, self.conn() as c:
             if isinstance(c, sqlite3.Connection):
                 c.execute("BEGIN IMMEDIATE")
+            if idempotency_key:
+                command = c.execute("SELECT request_hash,resource_id FROM idempotency_keys WHERE tenant_id=? AND principal=? AND action='review' AND key=?", (tenant, reviewer, idempotency_key)).fetchone()
+                if command:
+                    if command["request_hash"] != request_hash:
+                        raise IdempotencyConflict("Idempotency-Key was reused for a different review request")
+                    existing = c.execute("SELECT id,decision,manual_status FROM reviews WHERE tenant_id=? AND id=?", (tenant, command["resource_id"])).fetchone()
+                    if existing:
+                        status = "APPROVED" if existing["decision"] == "approve" and existing["manual_status"] == "passed" else "REJECTED"
+                        return (existing["id"], status), "OK"
             row = c.execute("SELECT * FROM proposals WHERE tenant_id=? AND id=?", (tenant, proposal_id)).fetchone()
             if not row:
                 return None, "NOT_FOUND"
@@ -325,5 +344,6 @@ class Store:
             if changed != 1:
                 return row, "STALE"
             c.execute("INSERT INTO reviews VALUES(?,?,?,?,?,?,?)", (tenant, review_id, proposal_id, reviewer, decision, manual, version))
+            if idempotency_key:
+                c.execute("INSERT INTO idempotency_keys VALUES(?,?,?,?,?,?,?)", (tenant, reviewer, "review", idempotency_key, request_hash, review_id, 201))
             return (review_id, status), "OK"
-

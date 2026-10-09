@@ -92,14 +92,17 @@ def test_fixture_workflow_ownership_job_findings_proposal_retest_review(tmp_path
         assert wrong_revision.status_code == 409
         assert wrong_revision.json()["code"] == "REVISION_MISMATCH"
 
-        retest = client.post(
-            f"/v1/fix-proposals/{proposal_body['id']}/retests",
-            headers=auth,
-            json={"repo_commit_sha": proposal_body["base_sha"], "expected_version": proposal_body["version"]},
-        )
-        assert retest.status_code == 202
+        retest_headers = {**auth, "Idempotency-Key": "e2e-retest-0001"}
+        retest_payload = {"repo_commit_sha": proposal_body["base_sha"], "expected_version": proposal_body["version"]}
+        retest = client.post(f"/v1/fix-proposals/{proposal_body['id']}/retests", headers=retest_headers, json=retest_payload)
+        replayed_retest = client.post(f"/v1/fix-proposals/{proposal_body['id']}/retests", headers=retest_headers, json=retest_payload)
+        assert retest.status_code == replayed_retest.status_code == 202
+        assert replayed_retest.json() == retest.json()
         assert retest.json()["retest_status"] == "PASSED"
         assert retest.json()["version"] == proposal_body["version"] + 1
+        conflicting_retest = client.post(f"/v1/fix-proposals/{proposal_body['id']}/retests", headers=retest_headers, json={"repo_commit_sha": "b" * 40, "expected_version": proposal_body["version"]})
+        assert conflicting_retest.status_code == 409
+        assert conflicting_retest.json()["code"] == "IDEMPOTENCY_KEY_REUSED"
 
         stale_retest = client.post(
             f"/v1/fix-proposals/{proposal_body['id']}/retests",
@@ -109,17 +112,21 @@ def test_fixture_workflow_ownership_job_findings_proposal_retest_review(tmp_path
         assert stale_retest.status_code == 409
         assert stale_retest.json()["code"] == "STALE_VERSION"
 
-        review = client.post(
-            f"/v1/fix-proposals/{proposal_body['id']}/reviews",
-            headers=auth,
-            json={
-                "patch_sha256": proposal_body["patch_sha256"],
-                "decision": "approve",
-                "manual_check_status": "passed",
-                "expected_version": retest.json()["version"],
-            },
-        )
-        assert review.status_code == 201 and review.json()["status"] == "APPROVED"
+        review_headers = {**auth, "Idempotency-Key": "e2e-review-0001"}
+        review_payload = {
+            "patch_sha256": proposal_body["patch_sha256"],
+            "decision": "approve",
+            "manual_check_status": "passed",
+            "expected_version": retest.json()["version"],
+        }
+        review = client.post(f"/v1/fix-proposals/{proposal_body['id']}/reviews", headers=review_headers, json=review_payload)
+        replayed_review = client.post(f"/v1/fix-proposals/{proposal_body['id']}/reviews", headers=review_headers, json=review_payload)
+        assert review.status_code == replayed_review.status_code == 201
+        assert {key: replayed_review.json()[key] for key in replayed_review.json() if key != "created_at"} == {key: review.json()[key] for key in review.json() if key != "created_at"}
+        assert review.json()["status"] == "APPROVED"
+        conflicting_review = client.post(f"/v1/fix-proposals/{proposal_body['id']}/reviews", headers=review_headers, json={**review_payload, "decision": "reject"})
+        assert conflicting_review.status_code == 409
+        assert conflicting_review.json()["code"] == "IDEMPOTENCY_KEY_REUSED"
         stale_review = client.post(
             f"/v1/fix-proposals/{proposal_body['id']}/reviews",
             headers=auth,
