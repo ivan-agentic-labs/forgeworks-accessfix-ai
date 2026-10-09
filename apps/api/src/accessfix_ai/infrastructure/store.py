@@ -233,15 +233,24 @@ class Store:
         with self.conn() as c:
             return c.execute("SELECT * FROM findings WHERE tenant_id=? AND id=?", (tenant, finding_id)).fetchone()
 
-    def proposal(self, tenant: str, finding_id: str, base_sha: str, alt_text: str):
+    def proposal(self, tenant: str, finding_id: str, base_sha: str, alt_text: str, *, principal: str = "system", idempotency_key: str | None = None):
+        request_hash = hashlib.sha256(json.dumps([finding_id, base_sha, alt_text], separators=(",", ":")).encode()).hexdigest()
         with self.lock, self.conn() as c:
             if isinstance(c, sqlite3.Connection):
                 c.execute("BEGIN IMMEDIATE")
+            if idempotency_key:
+                command = c.execute("SELECT * FROM idempotency_keys WHERE tenant_id=? AND principal=? AND action='proposal' AND key=?", (tenant, principal, idempotency_key)).fetchone()
+                if command:
+                    if command["request_hash"] != request_hash:
+                        raise IdempotencyConflict("Idempotency-Key was reused for a different proposal request")
+                    return c.execute("SELECT * FROM proposals WHERE tenant_id=? AND id=?", (tenant, command["resource_id"])).fetchone()
             existing = c.execute("SELECT * FROM proposals WHERE tenant_id=? AND finding_id=? AND base_sha=?", (tenant, finding_id, base_sha)).fetchone()
             if existing:
                 content = c.execute("SELECT * FROM proposal_sources WHERE tenant_id=? AND proposal_id=?", (tenant, existing["id"])).fetchone()
                 if not content or content["alt_text"] != alt_text:
                     raise ValueError("Existing proposal has different or unavailable source content")
+                if idempotency_key:
+                    c.execute("INSERT INTO idempotency_keys VALUES(?,?,?,?,?,?,?)", (tenant, principal, "proposal", idempotency_key, request_hash, existing["id"], 201))
                 return existing
             finding = c.execute("SELECT * FROM findings WHERE tenant_id=? AND id=?", (tenant, finding_id)).fetchone()
             if not finding or not finding["selector"].startswith("img#"):
@@ -260,6 +269,8 @@ class Store:
             proposal_id = str(uuid.uuid4())
             c.execute("INSERT INTO proposals VALUES(?,?,?,?,?,?,?,?)", (tenant, proposal_id, finding_id, base_sha, patch["patch_sha256"], "PENDING_RETEST", "NOT_RUN", 1))
             c.execute("INSERT INTO proposal_sources(tenant_id,proposal_id,source_sha,patched_sha,patch_text,patched_html,alt_text) VALUES(?,?,?,?,?,?,?)", (tenant, proposal_id, patch["source_sha256"], patch["patched_sha256"], patch["patch"], patch["patched_source"].decode("utf-8"), alt_text))
+            if idempotency_key:
+                c.execute("INSERT INTO idempotency_keys VALUES(?,?,?,?,?,?,?)", (tenant, principal, "proposal", idempotency_key, request_hash, proposal_id, 201))
         return self.proposal_get(tenant, proposal_id)
 
     def proposal_content(self, tenant: str, proposal_id: str):

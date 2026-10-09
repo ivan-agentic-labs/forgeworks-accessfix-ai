@@ -285,7 +285,9 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             return problem(409, "SOURCE_MAPPING_UNAVAILABLE", "Finding has no verified source mapping")
         scan = store.get_scan(c["tenant_id"], finding["scan_id"])
         try:
-            row = store.proposal(c["tenant_id"], str(finding_id), scan["commit_sha"], body.alt_text)
+            row = store.proposal(c["tenant_id"], str(finding_id), scan["commit_sha"], body.alt_text, principal=c["sub"], idempotency_key=idempotency_key)
+        except IdempotencyConflict as exc:
+            return problem(409, "IDEMPOTENCY_KEY_REUSED", str(exc))
         except ValueError as exc:
             return problem(409, "SOURCE_MAPPING_UNAVAILABLE", str(exc))
         return {
