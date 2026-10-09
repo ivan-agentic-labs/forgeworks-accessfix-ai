@@ -92,14 +92,14 @@ class PostgresStore(Store):
         self.dsn = dsn
         self.lock = threading.RLock()
         with psycopg.connect(dsn, row_factory=dict_row, connect_timeout=5) as db:
-            role = db.execute("SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user").fetchone()
-            if role["rolsuper"] or role["rolbypassrls"]:
-                raise ValueError("Runtime must not use a superuser or BYPASSRLS role")
+            role = db.execute("SELECT rolsuper, rolbypassrls, rolcreaterole, rolcreatedb FROM pg_roles WHERE rolname=current_user").fetchone()
+            if any(role.values()):
+                raise ValueError("Runtime must not use a superuser, BYPASSRLS, CREATEROLE or CREATEDB role")
             if not db.execute("SELECT pg_has_role(current_user, %s, 'MEMBER') AS allowed", (ROLE,)).fetchone()["allowed"]:
                 raise ValueError("Runtime login must be a member of the tenant application role")
-            if db.execute("SELECT 1 FROM pg_tables WHERE schemaname=current_schema() AND tableowner=current_user AND tablename IN ('sites','verification_challenges','scan_jobs','findings','proposals','reviews','memberships','idempotency_keys')").fetchone():
+            if db.execute("SELECT 1 FROM pg_tables WHERE schemaname=current_schema() AND tableowner IN (current_user, %s) AND tablename IN ('sites','verification_challenges','scan_jobs','findings','proposals','reviews','memberships','idempotency_keys')", (ROLE,)).fetchone():
                 raise ValueError("Runtime must not own product tables")
-            attributes = db.execute("SELECT rolsuper, rolbypassrls, rolcanlogin FROM pg_roles WHERE rolname=%s", (ROLE,)).fetchone()
+            attributes = db.execute("SELECT rolsuper, rolbypassrls, rolcanlogin, rolcreaterole, rolcreatedb FROM pg_roles WHERE rolname=%s", (ROLE,)).fetchone()
             if not attributes or any(attributes.values()):
                 raise ValueError("Tenant group role must be NOLOGIN, NOSUPERUSER and NOBYPASSRLS")
             if not db.execute("SELECT 1 FROM information_schema.columns WHERE table_name='scan_jobs' AND column_name='lease_until'").fetchone():

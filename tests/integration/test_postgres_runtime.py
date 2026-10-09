@@ -30,6 +30,16 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
     with pytest.raises(ValueError,match='superuser'):PostgresStore(owner)
     store=PostgresStore(runtime)
     assert not store.member(TENANT, "unmapped-oidc-subject")
+    # Even ownership of a different product table is forbidden to runtime login/group.
+    with psycopg.connect(owner) as db:
+        db.execute('ALTER TABLE memberships OWNER TO fw_runtime_test')
+    try:
+        with pytest.raises(ValueError,match='own product tables'):
+            PostgresStore(runtime)
+    finally:
+        with psycopg.connect(owner) as db:
+            db.execute('ALTER TABLE memberships OWNER TO postgres')
+
     assert store.member(TENANT,USER) and not store.member(other,USER)
     assert store.site(other,SITE) is None
     with psycopg.connect(runtime) as db:
