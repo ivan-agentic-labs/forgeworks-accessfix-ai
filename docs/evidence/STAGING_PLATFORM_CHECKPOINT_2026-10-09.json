@@ -1,0 +1,58 @@
+{
+  "product": "accessfix-ai",
+  "verified_source_commit": "2ff1e1064fd541671dd8e068da45d9bc2f69bd4b",
+  "workflows": [
+    {
+      "id": 37961429695,
+      "name": "G1 Contract Verification",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37961429695"
+    },
+    {
+      "id": 37961429771,
+      "name": "AccessFix Disposable Chromium Patch Proof",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37961429771"
+    },
+    {
+      "id": 37961429692,
+      "name": "AccessFix MVP Application CI",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37961429692"
+    },
+    {
+      "id": 37961429836,
+      "name": "AccessFix PostgreSQL Runtime Proof",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37961429836"
+    }
+  ],
+  "railway": {
+    "projectId": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
+    "environmentId": "0395e7ac-10f8-4004-8bb7-ddee901343c7",
+    "serviceId": "16693650-fec8-48e4-b934-e032dd391808",
+    "variables_and_config": "configured and read back",
+    "source_connection": "rejected: User does not have access to the repo",
+    "deployment_count": 0
+  },
+  "supabase": {
+    "projectId": "fljekuwplgkrpdoajyhn",
+    "schema": "fw_accessfix_ai",
+    "total_product_tables": 62,
+    "all_product_tables_forced_rls": true,
+    "cross_product_schema_grants": 0,
+    "public_schema_usage": false,
+    "application_users": 0,
+    "private_session_function_missing_session_result": false,
+    "positive_session_and_runtime_login_proof": "not yet performed"
+  },
+  "limits": [
+    "No deployment or live authenticated end-to-end proof",
+    "No production acceptance or full G1-E pass",
+    "Live role-switched row proof attempt was not applied; connector returned Invalid or expired requestState"
+  ]
+}

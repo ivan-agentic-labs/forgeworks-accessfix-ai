@@ -32,3 +32,7 @@ The API verifies ES256/RS256 against this project's public JWKS, issuer, audienc
 ## Rollback
 
 Keep the private database schemas intact when rolling back the app. Select an earlier tested app commit in Railway and verify `/readyz`. Schema deletion, membership changes and credential rotation are separate provisioning operations. Empty staging is not evidence of a successful production restore.
+
+## Current platform checkpoint
+
+All five Railway services and runtime variables are configured. Every GitHub source connection returned `User does not have access to the repo`; no deployment exists. Grant the Railway GitHub App access to the five private repositories under the ivan-agentic-labs account and confirm that account is connected inside Railway. Reconnect the exact source commit after CI verification. See `docs/evidence/STAGING_PLATFORM_CHECKPOINT_2026-10-09.json` for immutable source CI receipts and the remaining test limits.
