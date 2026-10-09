@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
@@ -23,8 +23,9 @@ from accessfix_ai.domain.target_policy import (
     validate_scan_path,
     validate_scan_request,
 )
-from accessfix_ai.infrastructure.store import SITE, TENANT, USER, Store
+from accessfix_ai.infrastructure.store import IdempotencyConflict, SITE, TENANT, USER, Store
 from accessfix_ai.presentation.auth import scope
+from accessfix_ai.worker import ScanWorker, WorkerConfig
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -95,12 +96,11 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         store.seed()
     stop = threading.Event()
 
+    scan_worker = ScanWorker(store, WorkerConfig(lease_seconds=0.25, timeout_seconds=2.0, max_attempts=3))
+
     def worker() -> None:
         while not stop.is_set():
-            with store.conn() as c:
-                pending = c.execute("SELECT * FROM scans WHERE status='PENDING'").fetchall()
-            for row in pending:
-                store.finish_scan(row["tenant_id"], row["id"])
+            scan_worker.run_once()
             stop.wait(0.05)
 
     @asynccontextmanager
@@ -193,7 +193,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         }
 
     @app.post("/v1/sites/{site_id}/scans", status_code=202)
-    def scan(site_id: UUID, body: StartScan, c=Depends(scope("scan:start", store))):
+    def scan(site_id: UUID, body: StartScan, response: Response, idempotency_key: Annotated[str | None, Header()] = None, c=Depends(scope("scan:start", store))):
         site = store.site(c["tenant_id"], str(site_id))
         if not site or site["status"] != "VERIFIED":
             return problem(403, "OWNERSHIP_REQUIRED", "Site ownership must be verified before scanning")
@@ -211,7 +211,13 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         policy = hashlib.sha256(
             (site["origin"] + "|same-origin|no-private-egress|redirects=" + "5").encode()
         ).hexdigest()
-        row = store.scan(c["tenant_id"], str(site_id), body.repo_commit_sha, policy)
+        try:
+            row = store.scan(
+                c["tenant_id"], str(site_id), body.repo_commit_sha, policy,
+                principal=c["sub"], idempotency_key=idempotency_key,
+            )
+        except IdempotencyConflict as exc:
+            return problem(409, "IDEMPOTENCY_KEY_REUSED", str(exc))
         return {
             "id": row["id"],
             "status": row["status"],
@@ -253,7 +259,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         return {"items": items, "next_cursor": None, "has_more": False}
 
     @app.post("/v1/findings/{finding_id}/fix-proposals", status_code=201)
-    def fix(finding_id: UUID, body: CreateFix, c=Depends(scope("patch:create", store))):
+    def fix(finding_id: UUID, body: CreateFix, idempotency_key: Annotated[str | None, Header()] = None, c=Depends(scope("patch:create", store))):
         finding = store.finding(c["tenant_id"], str(finding_id))
         if not finding or str(body.source_mapping_id) != str(finding_id):
             return problem(409, "SOURCE_MAPPING_UNAVAILABLE", "Finding has no verified source mapping")
@@ -274,7 +280,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         }
 
     @app.post("/v1/fix-proposals/{proposal_id}/retests", status_code=202)
-    def retest(proposal_id: UUID, body: Retest, c=Depends(scope("patch:create", store))):
+    def retest(proposal_id: UUID, body: Retest, idempotency_key: Annotated[str | None, Header()] = None, c=Depends(scope("patch:create", store))):
         result, status = store.retest(c["tenant_id"], str(proposal_id), body.repo_commit_sha, body.expected_version)
         if status == "NOT_FOUND":
             return problem(404, "RESOURCE_NOT_FOUND", "Proposal is not visible")
@@ -292,7 +298,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         }
 
     @app.post("/v1/fix-proposals/{proposal_id}/reviews", status_code=201)
-    def review(proposal_id: UUID, body: Review, c=Depends(scope("patch:review", store))):
+    def review(proposal_id: UUID, body: Review, idempotency_key: Annotated[str | None, Header()] = None, c=Depends(scope("patch:review", store))):
         if body.decision not in {"approve", "reject"} or body.manual_check_status not in {"passed", "failed", "not_applicable"}:
             return problem(400, "INVALID_REVIEW", "Review decision or manual status is invalid")
         result, status = store.review(
@@ -334,8 +340,8 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             "state": row["status"],
             "created_at": row["created_at"],
             "state_version": 1,
-            "attempt_count": 1,
-            "last_error_code": None,
+            "attempt_count": int(row["attempt_count"] or 0),
+            "last_error_code": row["last_error_code"],
         }
 
     return app

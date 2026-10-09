@@ -117,6 +117,15 @@ function json(body) {
   return JSON.stringify(body);
 }
 
+async function waitForJob(jobId) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const result = await request(`/v1/jobs/${jobId}`);
+    if (["SUCCEEDED", "FAILED", "CANCELLED", "TIMED_OUT"].includes(result.state)) return result;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("The fixture worker did not finish the job within the local wait window.");
+}
+
 async function waitForFinding(scanId) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const result = await request(`/v1/scans/${scanId}/findings`);
@@ -158,7 +167,9 @@ async function runFlow() {
     });
     setStep("scan", `Accepted ${scan.id}`, "passed");
 
-    setStep("findings", "Waiting for fixture worker", "running");
+    setStep("findings", "Polling fixture job", "running");
+    const job = await waitForJob(scan.job_id);
+    if (job.state !== "SUCCEEDED") throw new Error(`Fixture job stopped: ${job.state}`);
     const findings = await waitForFinding(scan.id);
     const finding = findings.items[0];
     setStep("findings", `${findings.items.length} finding(s) returned`, "passed");
@@ -185,11 +196,11 @@ async function runFlow() {
         patch_sha256: proposal.patch_sha256,
         decision: "approve",
         manual_check_status: "passed",
-        expected_version: proposal.version,
+        expected_version: retest.version,
       }),
     });
     setStep("review", `Recorded: ${review.status}`, "passed");
-    output.textContent = JSON.stringify({ challenge, verified, scan, findings, proposal, retest, review }, null, 2);
+    output.textContent = JSON.stringify({ challenge, verified, scan, job, findings, proposal, retest, review }, null, 2);
     setOverall("COMPLETE", "passed");
   } catch (error) {
     const failedStep = ["review", "retest", "findings", "scan", "ownership"].find((name) => document.querySelector(`[data-step="${name}"]`)?.dataset.state === "running");

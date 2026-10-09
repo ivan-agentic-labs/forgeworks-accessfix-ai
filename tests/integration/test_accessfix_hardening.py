@@ -101,6 +101,6 @@ def test_retest_is_bound_to_proposal_revision(tmp_path):
         review = client.post(
             f"/v1/fix-proposals/{proposal['id']}/reviews",
             headers=headers("patch:review"),
-            json={"patch_sha256": proposal["patch_sha256"], "decision": "approve", "manual_check_status": "passed", "expected_version": 1},
+            json={"patch_sha256": proposal["patch_sha256"], "decision": "approve", "manual_check_status": "passed", "expected_version": retest.json()["version"]},
         )
         assert review.status_code == 201

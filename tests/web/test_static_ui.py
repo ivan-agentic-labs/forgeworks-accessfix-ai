@@ -19,6 +19,7 @@ def test_fixture_console_is_static_and_complete():
         "/v1/sites/verification-challenges",
         "/v1/sites/${SITE_ID}/verify",
         "/v1/sites/${SITE_ID}/scans",
+        "/v1/jobs/${jobId}",
         "/v1/scans/${scanId}/findings",
         "/v1/findings/${finding.id}/fix-proposals",
         "/v1/fix-proposals/${proposal.id}/retests",
@@ -27,6 +28,9 @@ def test_fixture_console_is_static_and_complete():
         assert endpoint in client
     assert "setOverall(\"STOPPED\", \"blocked\")" in client
     assert "errorState.hidden = false" in client
+    assert "waitForJob(scan.job_id)" in client
+    assert 'if (job.state !== "SUCCEEDED")' in client
+    assert "Polling fixture job" in client
     assert "github" not in client.lower()
     assert "https://example.com" not in client.lower()
     assert ".panel" in styles
