@@ -40,7 +40,7 @@ class Store:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.init()
 
-    def conn(self) -> sqlite3.Connection:
+    def conn(self, tenant=None) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, uri=self._uri, check_same_thread=False, timeout=5)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA busy_timeout=5000")
@@ -254,3 +254,4 @@ class Store:
             c.execute("INSERT INTO reviews VALUES(?,?,?,?,?,?,?)", (tenant, review_id, proposal_id, reviewer, decision, manual, version))
             c.execute("UPDATE proposals SET status=? WHERE tenant_id=? AND id=? AND version=? AND status='PENDING_REVIEW'", (status, tenant, proposal_id, version))
             return (review_id, status), "OK"
+

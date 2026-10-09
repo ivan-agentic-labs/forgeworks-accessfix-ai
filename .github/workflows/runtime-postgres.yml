@@ -1,0 +1,34 @@
+name: AccessFix PostgreSQL Runtime Proof
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: forgeworks_runtime
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-disposable-ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d forgeworks_runtime"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e 'apps/api[test]' -r scripts/requirements-verification.txt
+      - name: Run PostgreSQL fixture scans, worker lease fencing, review and RLS tests
+        env:
+          G1_DISPOSABLE_DB: 'yes'
+          ACCESSFIX_DISPOSABLE_OWNER_DSN: 'host=127.0.0.1 port=5432 dbname=forgeworks_runtime user=postgres password=synthetic-disposable-ci-only'
+        run: python -W error -m pytest tests/integration/test_postgres_runtime.py -q

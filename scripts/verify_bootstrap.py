@@ -22,7 +22,7 @@ for p in root.glob(".github/workflows/*.yml"):
     if data.get("permissions") != {"contents": "read"}:
         errors.append(f"workflow permissions: {p.relative_to(root)}")
 for p in root.glob("migrations/versions/*.sql"):
-    if p.name != "001_accessfix_mvp.sql":
+    if p.name not in {"001_accessfix_mvp.sql", "002_accessfix_runtime.sql"}:
         errors.append(f"unapproved migration: {p.relative_to(root)}")
 patterns = {
     "private key": r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
@@ -56,3 +56,4 @@ print(json.dumps({"check": "bootstrap structure and heuristic sensitive-content 
                   "files_scanned": scanned, "errors": errors,
                   "limit": "Pattern checks cannot guarantee absence of all secrets or personal data."}, indent=2))
 sys.exit(bool(errors))
+

@@ -26,7 +26,7 @@ The test log and GitHub Actions run linked by the delivery report are authoritat
 - External S3-compatible storage, scanning/retention/deletion and backup/restore.
 - Remote sandbox/egress/SSRF/breakout evidence; execution remains disabled.
 - GitHub App installation/webhook/draft-PR effects and AI-provider quality/cost proof.
-- Full PostgreSQL runtime adapters for AccessFix, SpecForge, AgentTest and DataReconcile.
+- PostgreSQL runtime adapters now exist for all five projects. Each requires its dedicated disposable proof; production recovery/load/operations remains open.
 - Real source extraction/scanning/agent execution beyond the synthetic fixture scope.
 - Legal/domain/operations/accessibility/cost and independent reviewer acceptance.
 
@@ -40,3 +40,7 @@ Application test result: 29 passed.
 
 - [G1 Contract Verification](https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37883263861): **success**.
 - [AccessFix MVP Application CI](https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37883263893): **success**.
+
+## PostgreSQL and worker lease continuation
+
+Added a separately migrated non-owner adapter with forced RLS, transaction-local tenants, conservative advisory serialization and allowlisted worker claims. Actual ScanWorker completion/failure now propagates its claimed lease value. A regression test prevents stale workers from changing reclaimed jobs. Dedicated CI must pass before this adapter is marked verified; see ADR 0002.

@@ -33,7 +33,7 @@ class ScanWorker:
             return False
         tenant, scan_id = row["tenant_id"], row["id"]
         if row["cancel_requested"]:
-            self.store.fail_scan(tenant, scan_id, "CANCELLED", max_attempts=self.config.max_attempts)
+            self.store.fail_scan(tenant, scan_id, "CANCELLED", max_attempts=self.config.max_attempts, lease_until=row["lease_until"])
             return True
         started = time.monotonic()
         try:
@@ -41,11 +41,11 @@ class ScanWorker:
                 self.processor(dict(row))
             elapsed = time.monotonic() - started
             if elapsed > self.config.timeout_seconds:
-                self.store.fail_scan(tenant, scan_id, "WORKER_TIMEOUT", max_attempts=self.config.max_attempts)
+                self.store.fail_scan(tenant, scan_id, "WORKER_TIMEOUT", max_attempts=self.config.max_attempts, lease_until=row["lease_until"])
             else:
-                self.store.complete_scan(tenant, scan_id)
+                self.store.complete_scan(tenant, scan_id, lease_until=row["lease_until"])
         except Exception:
-            self.store.fail_scan(tenant, scan_id, "WORKER_ERROR", max_attempts=self.config.max_attempts)
+            self.store.fail_scan(tenant, scan_id, "WORKER_ERROR", max_attempts=self.config.max_attempts, lease_until=row["lease_until"])
         return True
 
     def drain(self, max_steps: int = 100) -> int:
@@ -53,3 +53,4 @@ class ScanWorker:
         while steps < max_steps and self.run_once():
             steps += 1
         return steps
+

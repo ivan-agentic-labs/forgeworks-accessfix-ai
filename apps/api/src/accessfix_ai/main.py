@@ -91,7 +91,13 @@ def _timestamp(value: datetime | None = None) -> str:
 
 
 def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
-    store = Store(db_path or os.getenv("ACCESSFIX_DB_PATH", str(ROOT / ".runtime/accessfix.db")))
+    if os.getenv("ACCESSFIX_DATABASE_URL"):
+        from accessfix_ai.infrastructure.postgres_store import PostgresStore
+        store = PostgresStore(os.environ["ACCESSFIX_DATABASE_URL"])
+    else:
+        if os.getenv("APP_ENV", "development") not in {"development", "test"}:
+            raise ValueError("SQLite is restricted to development/test")
+        store = Store(db_path or os.getenv("ACCESSFIX_DB_PATH", str(ROOT / ".runtime/accessfix.db")))
     if seed:
         store.seed()
     stop = threading.Event()
@@ -153,7 +159,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             return problem(400, "TARGET_NOT_ALLOWED", str(exc))
         token = secrets.token_urlsafe(24)
         expires = _timestamp(datetime.now(timezone.utc) + timedelta(minutes=15))
-        with store.conn() as db:
+        with store.conn(c["tenant_id"]) as db:
             db.execute(
                 "INSERT INTO sites VALUES(?,?,?,?,?,?) ON CONFLICT(tenant_id,id) DO UPDATE SET origin=excluded.origin,repo_id=excluded.repo_id,status='UNVERIFIED',verified_until=NULL",
                 (c["tenant_id"], SITE, origin, str(body.repository_id), "UNVERIFIED", None),
@@ -332,7 +338,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
     @app.get("/v1/jobs/{job_id}")
     def job(job_id: UUID, c=Depends(scope("job:read", store))):
-        with store.conn() as db:
+        with store.conn(c["tenant_id"]) as db:
             row = db.execute(
                 "SELECT * FROM scans WHERE tenant_id=? AND job_id=?", (c["tenant_id"], str(job_id))
             ).fetchone()

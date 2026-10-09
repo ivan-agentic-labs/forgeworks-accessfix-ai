@@ -1,0 +1,7 @@
+# AccessFix PostgreSQL fixture runtime
+
+The adapter uses separately applied migrations 001/002 and the canonical site/challenge/scan/finding tables. Runtime logins must not own tables or bypass RLS; they assume the tenant NOLOGIN/NOSUPERUSER/NOBYPASSRLS role. Tenant context and advisory serialization are transaction-local. Nested commands reuse the same transaction and cannot switch tenants/stores. Database connections close after outer commands; production load/pooling/recovery is unaccepted.
+
+Workers claim only an explicit ACCESSFIX_WORKER_TENANTS allowlist, using locked rows and durable leases. Both completion and failure now carry the claimed lease value, including the actual ScanWorker call path. A reclaimed lease fences an older worker before findings/state changes. Expected versions and idempotency remain durable across independent adapters. Reviews and idempotency receipts are insert-only for runtime.
+
+The dedicated disposable proof covers challenge state, concurrent scans, competing claims, stale lease denial, actual worker completion, fixture finding, fixture retest/human review transitions, real API read/job routes and missing-context/cross-tenant negative access. It does not verify external domain ownership, perform remote browser scanning, run accessibility testing on customer sites, prove patch byte execution, or establish sandbox escape/egress evidence. Remote scans remain blocked before DNS lookup.
