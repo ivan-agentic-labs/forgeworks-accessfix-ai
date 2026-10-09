@@ -5,7 +5,7 @@ permissions:
   contents: read
 jobs:
   ddl-probe:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
       postgres:
@@ -29,7 +29,7 @@ jobs:
       PGPASSWORD: g1_only_disposable_password
       PGDATABASE: forgeworks_g1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install psql client
         run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
       - name: Execute DDL candidate on empty disposable database
