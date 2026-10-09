@@ -40,7 +40,11 @@ for p in root.rglob("*"):
         errors.append(f"environment file: {rel}")
     if p.suffix in {".pem", ".key", ".p12", ".pfx"}:
         errors.append(f"credential file: {rel}")
-    text = p.read_text(encoding="utf-8")
+    try:
+        text = p.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        # Binary fixtures (for example PNG evidence) are not text secret surfaces.
+        continue
     scanned += 1
     # The scanner's own regex literals are definitions, not leaked credentials.
     if p == Path(__file__).resolve():
