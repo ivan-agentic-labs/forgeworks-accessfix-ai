@@ -20,7 +20,10 @@ def snapshot(dsn):
             columns = db.execute("SELECT column_name,data_type,is_nullable,column_default FROM information_schema.columns WHERE table_schema='public' AND table_name=%s ORDER BY ordinal_position",(table,)).fetchall()
             constraints = db.execute("SELECT conname,pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid=%s::regclass ORDER BY conname",('public.'+table,)).fetchall()
             flags = db.execute("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=%s::regclass",('public.'+table,)).fetchone()
-            result[table] = {'rows':len(rows),'sha256':hashlib.sha256(json.dumps(documents,separators=(',',':')).encode()).hexdigest(),'columns':columns,'constraints':constraints,'rls_flags':flags}
+            policies = db.execute("SELECT polname,polpermissive,polcmd,pg_get_expr(polqual,polrelid),pg_get_expr(polwithcheck,polrelid),ARRAY(SELECT rolname FROM pg_roles WHERE oid=ANY(polroles) ORDER BY rolname) FROM pg_policy WHERE polrelid=%s::regclass ORDER BY polname",('public.'+table,)).fetchall()
+            triggers = db.execute("SELECT tgname,pg_get_triggerdef(oid),tgenabled,pg_get_functiondef(tgfoid) FROM pg_trigger WHERE tgrelid=%s::regclass AND NOT tgisinternal ORDER BY tgname",('public.'+table,)).fetchall()
+            grants = db.execute("SELECT grantee,privilege_type,is_grantable FROM information_schema.role_table_grants WHERE table_schema='public' AND table_name=%s ORDER BY grantee,privilege_type,is_grantable",(table,)).fetchall()
+            result[table] = {'rows':len(rows),'sha256':hashlib.sha256(json.dumps(documents,separators=(',',':')).encode()).hexdigest(),'columns':columns,'constraints':constraints,'rls_flags':flags,'rls_policies':policies,'triggers_and_functions':triggers,'grants':grants}
     return result
 
 

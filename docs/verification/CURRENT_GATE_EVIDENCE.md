@@ -28,6 +28,8 @@ Source: `65bc8f36e594e8f84b0b1b2403cee6b67e8ecd50`. This immutable receipt cover
 
 ## Current product scope
 
+Disposable logical restore verification now compares actual tenant RLS policy expressions/role bindings, table grants, and non-internal trigger definitions/functions, in addition to row digests, columns, constraints and RLS flags. This remains a logical disposable proof, not PITR, regional failover or production operating acceptance.
+
 Fixture ownership/scan/retest/review state and fenced durable worker leases. Remote browser scans remain blocked; fixture findings are not WCAG certification.
 
 ## Remaining dependency and implementation register
