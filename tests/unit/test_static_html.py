@@ -19,7 +19,7 @@ def test_duplicate_ids_never_produce_unique_id_mapping():
     assert result[0]["fingerprint"] != result[1]["fingerprint"]
 
 
-@pytest.mark.parametrize("source", [b'<img alt="a" alt="b">', b'\x00', b'\xff', b'a' * (MAX_SOURCE_BYTES + 1)])
+@pytest.mark.parametrize("source", [b'<img alt="a" alt="b">', b'\x00', b'\xff', b'a' * (MAX_SOURCE_BYTES + 1)], ids=["duplicate-attributes", "nul", "invalid-utf8", "oversized"])
 def test_invalid_or_oversized_source_rejected(source):
     with pytest.raises(ValueError):
         image_alt_findings(source)
