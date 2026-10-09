@@ -1,0 +1,90 @@
+{
+  "verified_at_utc": "2026-10-09T17:53:46.131Z",
+  "product": "accessfix-ai",
+  "source_commit": "a7803808c59526a8d83f9997d56d030d0691a275",
+  "railway": {
+    "projectId": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
+    "environmentId": "0395e7ac-10f8-4004-8bb7-ddee901343c7",
+    "serviceId": "16693650-fec8-48e4-b934-e032dd391808",
+    "deploymentId": "1cfb1b2d-d345-48ca-8067-ad0bd9902e62",
+    "status": "SUCCESS",
+    "url": "https://accessfix-ai-staging.up.railway.app",
+    "pinned": true
+  },
+  "github_app": {
+    "installation_id": 169689787,
+    "account": "ivan-agentic-labs",
+    "selected_repository_count": 5
+  },
+  "tls": {
+    "mode": "verify-full",
+    "rootcert": "system",
+    "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
+    "ca_source": "https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt",
+    "ca_sha256_fingerprint": "807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa"
+  },
+  "workflows": [
+    {
+      "id": 37968862737,
+      "name": "G1 Contract Verification",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37968862737"
+    },
+    {
+      "id": 37968862664,
+      "name": "AccessFix MVP Application CI",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37968862664"
+    },
+    {
+      "id": 37968862654,
+      "name": "AccessFix PostgreSQL Runtime Proof",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37968862654"
+    },
+    {
+      "id": 37968862717,
+      "name": "AccessFix Disposable Chromium Patch Proof",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37968862717"
+    }
+  ],
+  "limits": [
+    "No positive authenticated business workflow or user session revocation proof",
+    "No production acceptance; remote agent execution remains disabled"
+  ],
+  "live_smoke": [
+    {
+      "check": "ready",
+      "url": "https://accessfix-ai-staging.up.railway.app/readyz",
+      "http_status": 200,
+      "body": "{\"status\":\"ready\"}",
+      "exit": 0
+    },
+    {
+      "check": "liveness",
+      "url": "https://accessfix-ai-staging.up.railway.app/healthz",
+      "http_status": 200,
+      "body": "{\"status\":\"ok\",\"service\":\"accessfix-ai\"}",
+      "exit": 0
+    },
+    {
+      "check": "no_token",
+      "url": "https://accessfix-ai-staging.up.railway.app/v1/scans/00000000-0000-0000-0000-000000000001/findings",
+      "http_status": 401,
+      "body": "{\"type\":\"about:blank\",\"title\":\"Request rejected\",\"status\":401,\"code\":\"UNAUTHENTICATED\",\"detail\":\"Bearer token is required\",\"request_id\":\"runtime\"}",
+      "exit": 0
+    },
+    {
+      "check": "invalid_token",
+      "url": "https://accessfix-ai-staging.up.railway.app/v1/scans/00000000-0000-0000-0000-000000000001/findings",
+      "http_status": 401,
+      "body": "{\"type\":\"about:blank\",\"title\":\"Request rejected\",\"status\":401,\"code\":\"INVALID_TOKEN\",\"detail\":\"Token signature or required claims are invalid\",\"request_id\":\"runtime\"}",
+      "exit": 0
+    }
+  ]
+}

@@ -35,4 +35,8 @@ Keep the private database schemas intact when rolling back the app. Select an ea
 
 ## Current platform checkpoint
 
-All five Railway services and runtime variables are configured. Every GitHub source connection returned `User does not have access to the repo`; no deployment exists. Grant the Railway GitHub App access to the five private repositories under the ivan-agentic-labs account and confirm that account is connected inside Railway. Reconnect the exact source commit after CI verification. See `docs/evidence/STAGING_PLATFORM_CHECKPOINT_2026-10-09.json` for immutable source CI receipts and the remaining test limits.
+The Railway GitHub App is installed on ivan-agentic-labs with access limited to the five ForgeWorks repositories. All five services reached terminal SUCCESS in the staging environment on 2026-10-10 (Asia/Jakarta). Their source is pinned to the recorded application commit; new pushes do not automatically deploy.
+
+The image includes the official Supabase Root 2021 CA. Configure `SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt` alongside the database URL with `sslmode=verify-full&sslrootcert=system`. The bundled psycopg OpenSSL runtime needs this explicit trust-store path. The certificate was downloaded from the project dashboard link, has SHA-256 fingerprint `807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa`, and expires 2031-04-26. Review CA rotation before expiration.
+
+See `docs/evidence/STAGING_DEPLOYMENT_2026-10-10.json` for deployment IDs, source and CI receipts, live smoke checks, and remaining limitations. The earlier checkpoint records the resolved repository-access blocker and is retained as historical evidence. Positive authenticated workflows and user session revocation still require provisioned test identities and have not been accepted.
