@@ -15,7 +15,15 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with: {python-version: '3.12'}
       - run: python -m pip install -e 'apps/api[test]' -r scripts/requirements-verification.txt
-      - run: python -m pytest tests/unit tests/integration tests/web
+      - run: python -W error -m pytest tests
       - run: python scripts/verify_bootstrap.py && python scripts/verify_contracts.py && python scripts/validate_openapi_independent.py
       - run: node --check apps/web/app.js
       - run: bash -n scripts/probe_disposable_postgres.sh scripts/test_disposable_postgres_rls.sh
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Generate and compile contract client
+        run: |
+          npm ci --prefix packages/sdk
+          npm run check --prefix packages/sdk

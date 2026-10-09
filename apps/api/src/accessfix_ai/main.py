@@ -199,8 +199,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             return problem(403, "OWNERSHIP_REQUIRED", "Site ownership must be verified before scanning")
         try:
             validate_scan_request(body.paths)
-            for path in body.paths:
-                validate_scan_path(path, site["origin"])
+
         except ValueError as exc:
             return problem(400, "TARGET_NOT_ALLOWED", str(exc))
         # The fixture runner is deterministic and local-only.  Real remote
@@ -208,6 +207,11 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         # are independently verified; never queue it optimistically.
         if site["origin"] != "http://fixture.local":
             return problem(503, "REMOTE_BROWSER_BLOCKED", "Remote browser scanning is disabled until isolation is verified")
+        try:
+            for path in body.paths:
+                validate_scan_path(path, site["origin"])
+        except ValueError as exc:
+            return problem(400, "TARGET_NOT_ALLOWED", str(exc))
         policy = hashlib.sha256(
             (site["origin"] + "|same-origin|no-private-egress|redirects=" + "5").encode()
         ).hexdigest()
@@ -348,3 +352,4 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
 
 app = create_app(seed=os.getenv("ACCESSFIX_SEED_FIXTURE", "0") == "1")
+

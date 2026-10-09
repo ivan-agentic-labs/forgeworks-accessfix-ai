@@ -1,0 +1,13 @@
+{
+  "name": "forgeworks-accessfix-ai-contract-client",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "generate": "openapi-typescript ../../contracts/openapi.yaml -o generated.ts",
+    "check": "npm run generate && tsc --noEmit --strict --skipLibCheck --lib es2022,dom generated.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.10.1",
+    "typescript": "5.9.3"
+  }
+}
