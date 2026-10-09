@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AccessFix AI — Fixture workflow</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <p class="eyebrow">AccessFix AI · local synthetic MVP</p>
+        <h1>Fixture workflow console</h1>
+        <p class="lede">
+          Exercise ownership, scanning, findings, retest, and human review against the local
+          <code>fixture.local</code> origin. This static page never enables remote browser or GitHub writes.
+        </p>
+      </header>
+
+      <section class="guardrail" aria-labelledby="guardrail-title">
+        <div>
+          <p class="eyebrow">Network guardrail</p>
+          <h2 id="guardrail-title">Remote browser scanning is blocked</h2>
+          <p>
+            Fixture origin only: <code>http://fixture.local</code>. Non-fixture origins are rejected
+            by the API with a fail-closed <code>REMOTE_BROWSER_BLOCKED</code> response.
+          </p>
+        </div>
+        <span class="pill blocked">BLOCKED BY DESIGN</span>
+      </section>
+
+      <section class="panel" aria-labelledby="config-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">1 · Configure</p>
+            <h2 id="config-title">Local API connection</h2>
+          </div>
+          <span class="pill fixture">FIXTURE ONLY</span>
+        </div>
+        <div class="form-grid">
+          <label>
+            API base URL
+            <input id="api-base" type="url" value="http://127.0.0.1:8000" autocomplete="off" />
+          </label>
+          <label>
+            Development bearer token
+            <input id="bearer-token" type="password" placeholder="Paste a development JWT" autocomplete="off" />
+          </label>
+          <label>
+            Fixture origin
+            <input id="fixture-origin" type="text" value="http://fixture.local" readonly />
+          </label>
+          <label>
+            Repository commit SHA
+            <input id="repo-sha" type="text" value="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" inputmode="text" />
+          </label>
+        </div>
+        <button id="run-flow" class="primary" type="button">Run fixture workflow</button>
+        <p class="hint">
+          The token is used only in memory for this page. Use a local development token; never paste
+          production credentials into this static demo.
+        </p>
+      </section>
+
+      <section id="error-state" class="error-state" role="alert" aria-live="assertive" hidden>
+        <div>
+          <p class="eyebrow">Request stopped</p>
+          <h2 id="error-title">Fail-closed error</h2>
+          <p id="error-detail"></p>
+        </div>
+        <button id="dismiss-error" class="quiet" type="button">Dismiss</button>
+      </section>
+
+      <section class="panel" aria-labelledby="flow-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">2 · Execute</p>
+            <h2 id="flow-title">Workflow status</h2>
+          </div>
+          <span id="overall-status" class="pill idle">IDLE</span>
+        </div>
+        <ol id="steps" class="steps">
+          <li data-step="ownership"><span class="step-marker">1</span><div><strong>Ownership</strong><small>Challenge and verify fixture origin</small></div><span class="step-status">Not started</span></li>
+          <li data-step="scan"><span class="step-marker">2</span><div><strong>Scan</strong><small>Queue deterministic local fixture scan</small></div><span class="step-status">Not started</span></li>
+          <li data-step="findings"><span class="step-marker">3</span><div><strong>Findings</strong><small>Read accessibility findings and evidence</small></div><span class="step-status">Not started</span></li>
+          <li data-step="retest"><span class="step-marker">4</span><div><strong>Retest</strong><small>Retest the proposal at its base revision</small></div><span class="step-status">Not started</span></li>
+          <li data-step="review"><span class="step-marker">5</span><div><strong>Review</strong><small>Record a human approve/reject decision</small></div><span class="step-status">Not started</span></li>
+        </ol>
+      </section>
+
+      <section class="panel" aria-labelledby="output-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">3 · Evidence</p>
+            <h2 id="output-title">Last response</h2>
+          </div>
+        </div>
+        <pre id="output" class="output" aria-live="polite">No requests yet.</pre>
+      </section>
+
+      <footer>
+        <p>Local synthetic evidence only. Automated findings are not WCAG certification.</p>
+        <p><a href="../README.md">Repository run documentation</a></p>
+      </footer>
+    </main>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

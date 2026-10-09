@@ -12,6 +12,7 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
 from accessfix_ai.domain.target_policy import (
@@ -111,6 +112,21 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         thread.join(1)
 
     app = FastAPI(title="AccessFix AI MVP", version="0.1.0", lifespan=lifespan)
+    # The static fixture console is intentionally local-only. Never use a wildcard
+    # origin or allow credentials here; production identity remains a future BFF.
+    ui_origins = [
+        origin.strip()
+        for origin in os.getenv("ACCESSFIX_UI_ORIGINS", "http://127.0.0.1:8080,http://localhost:8080").split(",")
+        if origin.strip()
+    ]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=ui_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Accept", "Authorization", "Content-Type", "Idempotency-Key"],
+        expose_headers=["X-Development-Challenge-Token"],
+    )
     app.state.store = store
 
     @app.exception_handler(HTTPException)

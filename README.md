@@ -14,6 +14,21 @@ python -W error -m pytest tests/integration
 ```
 The SQLite store, development issuer, and `fixture.local` are test-only. Automated findings are not WCAG certification. See `docs/evidence/MVP_CHECKPOINT.md`.
 
+## Static fixture UI
+
+The dependency-free console in `apps/web/` drives the ownership, scan, findings, fix-proposal,
+retest, and human-review flow against `http://fixture.local` only. Remote browser execution is
+fail-closed and GitHub writes remain disabled. Run the API and UI in separate terminals:
+
+```bash
+ACCESSFIX_SEED_FIXTURE=1 PYTHONPATH=apps/api/src uvicorn accessfix_ai.main:app --port 8000
+python -m http.server 8080 --bind 127.0.0.1 --directory apps/web
+```
+
+Open `http://127.0.0.1:8080` and provide a local development JWT. The page renders stopped error
+states for API failures, including `REMOTE_BROWSER_BLOCKED`. See `apps/web/README.md` and
+`docs/evidence/LOCAL_UI_AND_RLS_RUN.md` for the complete run record.
+
 ## Documents
 - Product scope: `docs/product/PRODUCT_SCOPE.md`
 - Architecture and file ownership: `docs/architecture/`
@@ -30,7 +45,9 @@ python scripts/verify_contracts.py
 python scripts/validate_openapi_independent.py
 ```
 
-CI contains a manual PostgreSQL disposable DDL smoke test. **No live RLS/two-tenant proof or sandbox evidence is claimed.**
+CI contains a manual PostgreSQL disposable DDL smoke test and a separate disposable runtime RLS
+negative test. The latter is only a local two-tenant proof for the current migration; no production
+or third-party target is used.
 
 ## Non-goals at this stage
 No production deployment, customer data, code-execution agent, public access, financial mutation, license assertion or fake passing tests.
