@@ -160,10 +160,10 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
     @app.post("/v1/sites/verification-challenges", status_code=201)
     def challenge(body: Challenge, response: Response, c=Depends(scope("site:verify", store))):
-        if os.getenv("APP_ENV", "development") not in {"development", "test"}:
+        if os.getenv("APP_ENV", "development") not in {"development", "test"} and os.getenv("OWNERSHIP_VERIFY_MODE") != "http-file":
             return problem(503, "OWNERSHIP_VERIFIER_NOT_CONFIGURED", "An external ownership verifier is required")
         try:
-            origin = validate_origin(body.canonical_origin)
+            origin = validate_origin(body.canonical_origin, allow_fixture=os.getenv("APP_ENV", "development") in {"development", "test"})
         except ValueError as exc:
             return problem(400, "TARGET_NOT_ALLOWED", str(exc))
         token = secrets.token_urlsafe(24)
@@ -174,20 +174,23 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
                 (c["tenant_id"], SITE, origin, str(body.repository_id), "UNVERIFIED", None),
             )
         challenge_id = store.challenge(c["tenant_id"], SITE, token, expires)
-        response.headers["X-Development-Challenge-Token"] = token
+        external = os.getenv("OWNERSHIP_VERIFY_MODE") == "http-file"
+        if not external:
+            response.headers["X-Development-Challenge-Token"] = token
         return {
             "id": challenge_id,
             "status": "PENDING",
             "created_at": _timestamp(),
             "site_id": SITE,
             "canonical_origin": origin,
-            "verification_method": "DEVELOPMENT_HEADER_TOKEN",
+            "verification_method": "HTTP_WELL_KNOWN_FILE" if external else "DEVELOPMENT_HEADER_TOKEN",
+            **({"verification_token": token, "verification_path": "/.well-known/forgeworks-site-verification.txt"} if external else {}),
             "expires_at": expires,
         }
 
     @app.post("/v1/sites/{site_id}/verify")
     def verify(site_id: UUID, body: Verify, c=Depends(scope("site:verify", store))):
-        if os.getenv("APP_ENV", "development") not in {"development", "test"}:
+        if os.getenv("APP_ENV", "development") not in {"development", "test"} and os.getenv("OWNERSHIP_VERIFY_MODE") != "http-file":
             return problem(503, "OWNERSHIP_VERIFIER_NOT_CONFIGURED", "An external ownership verifier is required")
         row = store.get_challenge(c["tenant_id"], str(body.challenge_id))
         if (
@@ -198,6 +201,11 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             or hashlib.sha256(body.evidence_token.encode()).hexdigest() != row["token_hash"]
         ):
             return problem(400, "VERIFICATION_FAILED", "Challenge is invalid, expired, or already used")
+        if os.getenv("OWNERSHIP_VERIFY_MODE") == "http-file":
+            from accessfix_ai.infrastructure.ownership_verifier import verify_ownership
+            target = store.site(c["tenant_id"], str(site_id))
+            if not target or not verify_ownership(target["origin"], body.evidence_token):
+                return problem(400, "OWNERSHIP_PROOF_UNAVAILABLE", "Publish the challenge token at the HTTPS verification path before verifying")
         site = store.verify(c["tenant_id"], str(body.challenge_id))
         proof = hashlib.sha256((site["origin"] + body.evidence_token).encode()).hexdigest()
         return {
