@@ -106,7 +106,7 @@ def test_staging_sqlite_readiness_denied(identity):
     with pytest.raises(HTTPException) as error: readiness(object())
     assert error.value.status_code==503
 
-@pytest.mark.parametrize("url",["http://project.supabase.co","https://attacker.invalid","https://user:pass@"+"project.supabase.co","https://project.supabase.co/path","https://project.supabase.co?x=y"])
+@pytest.mark.parametrize("url",["http://project.supabase.co","https://attacker.invalid","https://user:pass@"+"project.supabase.co","https://project.supabase.co/path","https://project.supabase.co?x=y"], ids=["insecure", "foreign", "userinfo", "path", "query"])
 def test_supabase_configuration_origin(monkeypatch,url):
     monkeypatch.setenv("AUTH_MODE","supabase")
     monkeypatch.setenv("SUPABASE_URL",url)
