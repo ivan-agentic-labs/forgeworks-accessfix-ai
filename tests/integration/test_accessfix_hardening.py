@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 import time
 
 import jwt
+import pytest
 from fastapi.testclient import TestClient
 
 from accessfix_ai.infrastructure.store import SITE, TENANT, USER
@@ -11,6 +12,28 @@ SECRET = "forgeworks-development-secret-32-plus"
 ISS = "https://issuer.synthetic.invalid"
 AUD = "forgeworks-api"
 REPO = "a" * 40
+
+
+@pytest.mark.parametrize("length", [39, 41, 48, 63, 65])
+def test_intermediate_or_invalid_revision_lengths_rejected(tmp_path, length):
+    with TestClient(create_app(str(tmp_path / "db.sqlite"), seed=True)) as client:
+        result = client.post(f"/v1/sites/{SITE}/scans", headers=headers("scan:start"), json={"repo_commit_sha": "a" * length, "paths": ["/"]})
+        assert result.status_code == 422
+        result = client.post("/v1/fix-proposals/33333333-3333-3333-3333-333333333333/retests", headers=headers("patch:create"), json={"repo_commit_sha": "a" * length, "expected_version": 1})
+        assert result.status_code == 422
+
+
+@pytest.mark.parametrize("paths", [["/other"], ["/", "/"], ["/?page=2"]])
+def test_fixture_scope_is_not_silently_replaced(tmp_path, paths):
+    with TestClient(create_app(str(tmp_path / "db.sqlite"), seed=True)) as client:
+        verified_scan(client)
+        with client.app.state.store.conn() as db:
+            before = db.execute("SELECT count(*) FROM scans").fetchone()[0]
+        result = client.post(f"/v1/sites/{SITE}/scans", headers=headers("scan:start"), json={"repo_commit_sha": REPO, "paths": paths})
+        assert result.status_code == 503
+        assert result.json()["code"] == "SCAN_SCOPE_UNSUPPORTED"
+        with client.app.state.store.conn() as db:
+            assert db.execute("SELECT count(*) FROM scans").fetchone()[0] == before
 
 
 def token(scope: str, tenant: str = TENANT):
@@ -104,3 +127,4 @@ def test_retest_is_bound_to_proposal_revision(tmp_path):
             json={"patch_sha256": proposal["patch_sha256"], "decision": "approve", "manual_check_status": "passed", "expected_version": retest.json()["version"]},
         )
         assert review.status_code == 201
+

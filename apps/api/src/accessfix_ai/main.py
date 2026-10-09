@@ -44,7 +44,7 @@ class Verify(BaseModel):
 
 class StartScan(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    repo_commit_sha: str = Field(pattern=r"^[0-9a-fA-F]{40,64}$")
+    repo_commit_sha: str = Field(pattern=r"^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$")
     paths: list[str] = Field(min_length=MIN_SCAN_PATHS, max_length=MAX_SCAN_PATHS)
 
 
@@ -55,7 +55,7 @@ class CreateFix(BaseModel):
 
 class Retest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    repo_commit_sha: str = Field(pattern=r"^[0-9a-fA-F]{40,64}$")
+    repo_commit_sha: str = Field(pattern=r"^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$")
     expected_version: int = Field(ge=1)
 
 
@@ -218,6 +218,8 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
                 validate_scan_path(path, site["origin"])
         except ValueError as exc:
             return problem(400, "TARGET_NOT_ALLOWED", str(exc))
+        if body.paths != ["/"]:
+            return problem(503, "SCAN_SCOPE_UNSUPPORTED", "The local fixture runner supports exactly one root path; no scan was queued")
         policy = hashlib.sha256(
             (site["origin"] + "|same-origin|no-private-egress|redirects=" + "5").encode()
         ).hexdigest()
