@@ -97,7 +97,7 @@ class PostgresStore(Store):
                 raise ValueError("Runtime must not use a superuser, BYPASSRLS, CREATEROLE or CREATEDB role")
             if not db.execute("SELECT pg_has_role(current_user, %s, 'MEMBER') AS allowed", (ROLE,)).fetchone()["allowed"]:
                 raise ValueError("Runtime login must be a member of the tenant application role")
-            if db.execute("SELECT 1 FROM pg_tables WHERE schemaname=current_schema() AND tableowner IN (current_user, %s) AND tablename IN ('sites','verification_challenges','scan_jobs','findings','proposals','reviews','memberships','idempotency_keys')", (ROLE,)).fetchone():
+            if db.execute("SELECT 1 FROM pg_tables WHERE schemaname=current_schema() AND tableowner IN (current_user, %s) AND tablename IN ('tenants','sites','verification_challenges','scan_jobs','findings','proposals','reviews','memberships','idempotency_keys')", (ROLE,)).fetchone():
                 raise ValueError("Runtime must not own product tables")
             attributes = db.execute("SELECT rolsuper, rolbypassrls, rolcanlogin, rolcreaterole, rolcreatedb FROM pg_roles WHERE rolname=%s", (ROLE,)).fetchone()
             if not attributes or any(attributes.values()):

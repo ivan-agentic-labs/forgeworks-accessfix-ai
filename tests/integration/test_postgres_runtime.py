@@ -7,7 +7,7 @@ import psycopg
 import pytest
 from psycopg.conninfo import conninfo_to_dict,make_conninfo
 from accessfix_ai.infrastructure.store import TENANT,USER,SITE
-from accessfix_ai.infrastructure.postgres_store import PostgresStore
+from accessfix_ai.infrastructure.postgres_store import PostgresStore, ROLE
 from accessfix_ai.worker import ScanWorker,WorkerConfig
 
 
@@ -30,15 +30,17 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
     with pytest.raises(ValueError,match='superuser'):PostgresStore(owner)
     store=PostgresStore(runtime)
     assert not store.member(TENANT, "unmapped-oidc-subject")
-    # Even ownership of a different product table is forbidden to runtime login/group.
-    with psycopg.connect(owner) as db:
-        db.execute('ALTER TABLE memberships OWNER TO fw_runtime_test')
-    try:
-        with pytest.raises(ValueError,match='own product tables'):
-            PostgresStore(runtime)
-    finally:
+    # Runtime login and its group cannot own tenant/provisioning tables either.
+    for table, new_owner in [('memberships','fw_runtime_test'),('tenants',ROLE)]:
         with psycopg.connect(owner) as db:
-            db.execute('ALTER TABLE memberships OWNER TO postgres')
+            db.execute(psycopg.sql.SQL('ALTER TABLE {} OWNER TO {}').format(psycopg.sql.Identifier(table),psycopg.sql.Identifier(new_owner)))
+        try:
+            with pytest.raises(ValueError,match='own product tables'):
+                PostgresStore(runtime)
+        finally:
+            with psycopg.connect(owner) as db:
+                db.execute(psycopg.sql.SQL('ALTER TABLE {} OWNER TO postgres').format(psycopg.sql.Identifier(table)))
+                db.execute(psycopg.sql.SQL('REVOKE ALL ON {} FROM {}').format(psycopg.sql.Identifier(table),psycopg.sql.Identifier(new_owner)))
 
     assert store.member(TENANT,USER) and not store.member(other,USER)
     assert store.site(other,SITE) is None

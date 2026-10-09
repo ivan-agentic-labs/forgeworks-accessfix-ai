@@ -1,5 +1,5 @@
 # accessfix-ai — G1-D / G1-E decision
-**G1-D: CONDITIONAL REVIEW, NOT SIGNED. G1-E: BLOCKED (missing external/runtime evidence).**
+**Owner approval to proceed: RECORDED. Domain/independent signoffs: OPEN. G1-E: PARTIAL / BLOCKED.**
 
 **Required domain signoff:** domain ownership validation, browser isolation, DOM-to-source mapping, human accessibility testing.
 **Fail-closed constraint:** No unauthorised URL scanning; automated a11y results are not full WCAG conformance.
@@ -9,3 +9,8 @@ Canonical implementation-input files are `contracts/openapi.yaml`, `contracts/ev
 The `30_` file contains proposed composite FKs only. **Do not apply automatically**, migrate real data, or mark it approved before domain/cardinality/delete-semantics review and live PostgreSQL tests. It is deliberately not merged into `10_schema_candidate.sql`.
 
 Required before G1-E PASS: semantic OpenAPI validator+client compilation, PostgreSQL empty-DB migration and two-tenant negative tests, ownership/membership authorization checks, identity provider integration, sandbox escape/egress tests where relevant, and production budget/privacy/domain review.
+
+
+## Current engineering evidence
+
+[Current gate ledger](CURRENT_GATE_EVIDENCE.md) supersedes earlier NOT_RUN labels only for its explicitly verified scope. Design-candidate SQL, external acceptance and full-gate approval remain separate.

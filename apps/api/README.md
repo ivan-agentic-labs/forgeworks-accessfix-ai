@@ -1,7 +1,13 @@
-# AccessFix AI MVP
+# AccessFix AI API runtime
 
-Synthetic-only MVP: ownership challenge, verified-site scan command, fail-closed target policy, deterministic fixture finding, proposal/review state, and a local polling worker.
+Fixture ownership/scan/retest/review state and fenced durable worker leases. Remote browser scans remain blocked; fixture findings are not WCAG certification.
 
-Run `python -m pip install -e 'apps/api[test]'`, then `ACCESSFIX_SEED_FIXTURE=1 PYTHONPATH=apps/api/src uvicorn accessfix_ai.main:app`.
+Install with `python -m pip install -e 'apps/api[test]'`. Run `uvicorn accessfix_ai.main:app` after configuring authentication and persistence. Required auth configuration is documented in `.env.example`: issuer/audience and either trusted OIDC HTTPS JWKS configuration or explicit development/test authentication. Development auth requires an explicit separate secret; there is no shared-secret fallback.
 
-The local SQLite store, development HS256 issuer, and `fixture.local` are test-only. Remote browser scans fail closed until browser isolation and egress controls are independently verified. Automated findings are not WCAG certification. GitHub write is disabled.
+Set `ACCESSFIX_DATABASE_URL` to select PostgreSQL. Apply migrations under `migrations/versions` in order using the separate migration/provisioning role. Runtime login must be a non-owner member of the product tenant role and have no superuser/BYPASSRLS/CREATEROLE/CREATEDB privileges. Runtime cannot own product or tenant/provisioning tables. Identities require provisioned internal UUID mapping. SQLite is restricted to development/test; PostgreSQL runtime refuses fixture identity seeding.
+
+The dedicated `.github/workflows/runtime-postgres.yml` verifies a fresh disposable database, product runtime commands, tenant boundaries/concurrency and logical restore. Candidate SQL under docs/verification/sql-candidates is not auto-applied. No real provider call, production deployment or customer-data use is introduced.
+
+See [current G1/G2 ledger](../../docs/verification/CURRENT_GATE_EVIDENCE.md) for exact source/run evidence and unfinished integrations.
+
+Workers require `ACCESSFIX_WORKER_TENANTS` as an explicit PostgreSQL tenant allowlist.

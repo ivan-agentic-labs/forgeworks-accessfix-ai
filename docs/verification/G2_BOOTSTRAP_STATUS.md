@@ -1,9 +1,9 @@
-# G2 bootstrap status — 9 October 2026
+# G2 bootstrap status — 2026-10-09
 
-Owner: `ivan-agentic-labs`. Five independent private repositories are authorized. The tested source snapshot captured from `main` is recorded in [`docs/evidence/G1_RUNTIME_EVIDENCE.md`](../evidence/G1_RUNTIME_EVIDENCE.md) at revision `9051010fa29f0d10ac7b8bf342758474cfd1e1d5`; the evidence-document commit is documentation-only.
+Owner: `ivan-agentic-labs`. Repository bootstrap and scoped engineering verification are complete for the tested source receipt. Engineering now proceeds directly on main under the latest owner authorization. The repository remains private and independent.
 
-The tested main source snapshot has successful GitHub Actions evidence for application CI, independent/static contract checks, an empty disposable PostgreSQL migration, and the non-owner two-tenant RLS negative test. Local synthetic API/UI, auth/tenant negative, worker-reliability, and artifact/integrity guard tests also pass. These are partial, scoped results: G1-D remains conditional/not signed and G1-E remains OPEN/BLOCKED until the required external and operational evidence is accepted.
+Current evidence and exact commit/run links: [CURRENT_GATE_EVIDENCE.md](CURRENT_GATE_EVIDENCE.md) and [main source receipt](../evidence/MAIN_VERIFICATION_2026-10-09.json). Historical receipts retain their original scope.
 
-Generated-client compilation, real IdP/OIDC session and CSRF tests, independent browser sandbox/egress testing, external storage, legal/domain/privacy/operations/cost signoff, production backup/restore, and other unavailable evidence remain NOT_RUN or BLOCKED. No production deployment or customer data is authorized.
+Contracts/client compilation, complete application tests, implemented PostgreSQL MVP runtime with negative RLS/concurrency checks and disposable logical restore have passed. These are scoped results; G1-E remains OPEN/BLOCKED. Real identities/BFF, external storage/source ingestion, sandbox/provider/product GitHub App effects, PITR/load/regional recovery and independent acceptance remain unfinished or blocked. No production deployment or customer data is used.
 
-The PostgreSQL workflow uses an intentionally public, disposable localhost-only test password. This is not a production credential. Never reuse it outside the isolated test service.
+CI database credentials are intentionally synthetic and confined to fresh disposable localhost services.

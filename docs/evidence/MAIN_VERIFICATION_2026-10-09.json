@@ -1,0 +1,43 @@
+{
+  "slug": "accessfix-ai",
+  "source_sha": "65bc8f36e594e8f84b0b1b2403cee6b67e8ecd50",
+  "scope": "Exact source commit; synthetic/disposable evidence; G1-E remains open",
+  "runs": [
+    {
+      "name": "AccessFix MVP Application CI",
+      "id": 37888159237,
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37888159237",
+      "head_sha": "65bc8f36e594e8f84b0b1b2403cee6b67e8ecd50",
+      "conclusion": "success"
+    },
+    {
+      "name": "G1 Contract Verification",
+      "id": 37888159283,
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37888159283",
+      "head_sha": "65bc8f36e594e8f84b0b1b2403cee6b67e8ecd50",
+      "conclusion": "success"
+    },
+    {
+      "name": "AccessFix PostgreSQL Runtime Proof",
+      "id": 37888159273,
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37888159273",
+      "head_sha": "65bc8f36e594e8f84b0b1b2403cee6b67e8ecd50",
+      "conclusion": "success"
+    }
+  ],
+  "logs": [
+    {
+      "workflow": "AccessFix MVP Application CI",
+      "observed": [
+        "======================== 35 passed, 1 skipped in 2.91s ========================="
+      ]
+    },
+    {
+      "workflow": "AccessFix PostgreSQL Runtime Proof",
+      "observed": [
+        "1 passed in 1.15s",
+        "{\"check\": \"disposable logical restore and restored membership/RLS\", \"limits\": \"Not PITR, regional failover, production RTO/RPO or operational signoff\", \"result\": \"PASS\", \"rows\": 12, \"tables\": 9}"
+      ]
+    }
+  ]
+}
