@@ -1,0 +1,85 @@
+{
+  "date": "2026-10-10",
+  "environment": "staging",
+  "status": "PARTIAL_NOT_READY_FOR_FULL_PRODUCT_USE",
+  "production_ready": false,
+  "railway_project": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
+  "supabase_project": "fljekuwplgkrpdoajyhn",
+  "verification": {
+    "workflow_yaml_files_parsed": 24,
+    "session_race_tests": {
+      "passed": 15,
+      "total": 15,
+      "scope": "mocked browser DOM and authentication responses; not live owner login"
+    },
+    "application_tests_previous_verified_checkpoint": {
+      "passed": 527,
+      "skipped": 6,
+      "scope": "synthetic local and CI test data"
+    },
+    "owner_live_business_acceptance": "NOT_COMPLETED"
+  },
+  "changes": [
+    "Protect cleared login sessions against delayed refresh and login responses",
+    "Suppress duplicate login submissions",
+    "Run disposable PostgreSQL 17 CI without Docker Hub pulls",
+    "Repair DataReconcile G2 workflow YAML",
+    "Publish product-specific staging quickstart",
+    "Use official Docker Python 3.12 slim mirror on public ECR after Docker Hub 429/504 build failures"
+  ],
+  "remaining": [
+    "Verified owner Supabase Auth account and active product memberships/grants",
+    "GitHub identity verification and dedicated APIShield GitHub App credentials; deployment app is separate",
+    "APIShield completed repository analysis worker flow",
+    "AccessFix isolated browser runner for actual remote scans",
+    "AgentTest actual agent execution remains disabled; live verdict cryptographic verification incomplete",
+    "Live authenticated browser acceptance blocked by staging domain network policy"
+  ],
+  "limits": [
+    "Storage probe proves only synthetic object upload/read/digest/size/delete, not owner business flows",
+    "AccessFix Chromium proof uses disposable fixtures, not a remote customer site",
+    "No production or customer data processed",
+    "No upgrade to paid infrastructure plans"
+  ],
+  "product": "accessfix-ai",
+  "source_commit": "530193cdd3207785c600a983f2658c09eb2793f2",
+  "deployment": {
+    "id": "fdf4594c-7f1d-4305-89ab-eedc6d7790b2",
+    "status": "SUCCESS",
+    "updated_at": "2026-10-09T21:28:41.578Z",
+    "service_id": "16693650-fec8-48e4-b934-e032dd391808"
+  },
+  "ci": [
+    {
+      "id": 37993587678,
+      "name": "G1 Contract Verification",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37993587678"
+    },
+    {
+      "id": 37993587681,
+      "name": "AccessFix MVP Application CI",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37993587681"
+    },
+    {
+      "id": 37993588530,
+      "name": "AccessFix PostgreSQL Runtime Proof",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37993588530"
+    },
+    {
+      "id": 37993587715,
+      "name": "AccessFix Disposable Chromium Patch Proof",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37993587715"
+    }
+  ],
+  "storage_probe": {
+    "status": "NOT_APPLICABLE"
+  }
+}
