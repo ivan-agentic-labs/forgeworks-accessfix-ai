@@ -1,0 +1,171 @@
+{
+  "date": "2026-10-10",
+  "environment": "staging",
+  "status": "PARTIAL_BUSINESS_ACCEPTANCE",
+  "supabase_project": "fljekuwplgkrpdoajyhn",
+  "railway_project": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
+  "live_auth": {
+    "users": 2,
+    "tenants": 2,
+    "password_login": "PASS",
+    "apiShield_analysis_create_read": "PASS",
+    "apiShield_cross_tenant_read": "404 RESOURCE_NOT_FOUND",
+    "agentTest_dataset_source_ingestion": "PASS",
+    "agentTest_evaluations": {
+      "runs": 2,
+      "status": "SUCCEEDED",
+      "source": "actual inline JSONL",
+      "results": "explicit synthetic case results",
+      "agent_execution": false
+    },
+    "agentTest_cross_tenant_version_write": "404 RESOURCE_NOT_FOUND",
+    "agentTest_cross_tenant_case_list": "200 with empty items; no tenant A case exposed",
+    "agentTest_comparison": {
+      "verdict": "PASS",
+      "paired_cases": 1,
+      "missing_cases": 0,
+      "confirmation": "database read through Supabase connector"
+    },
+    "agentTest_signature_verification": "NOT_COMPLETED",
+    "session_logout_and_old_token_denial": "NOT_COMPLETED"
+  },
+  "fixes": [
+    {
+      "product": "accessfix-ai",
+      "change": "Reject development-only ownership challenge creation and verification in staging/production",
+      "sha": "7c79228205b403efb5af4f851f35c5eb0b4b50b7",
+      "tests_passed": 104,
+      "tests_skipped": 1,
+      "ci": [
+        {
+          "id": 37974636322,
+          "name": "G1 Contract Verification",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 37974636288,
+          "name": "AccessFix MVP Application CI",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 37974636243,
+          "name": "AccessFix PostgreSQL Runtime Proof",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 37974636265,
+          "name": "AccessFix Disposable Chromium Patch Proof",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "product": "agenttest-lab",
+      "change": "Reject placeholder upload intents and metadata-only artifact commits in staging/production",
+      "sha": "99b0f637b4be7ca7969ec317ee80a3027c4260f4",
+      "tests_passed": 91,
+      "tests_skipped": 1,
+      "ci": [
+        {
+          "id": 37974623231,
+          "name": "G1 Contract Verification",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 37974623279,
+          "name": "AgentTest PostgreSQL Runtime Proof",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 37974623207,
+          "name": "AgentTest MVP Application CI",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "remaining_business_integrations": [
+    "SpecForge external source artifact storage",
+    "DataReconcile external CSV artifact storage",
+    "AgentTest external artifact uploads",
+    "AccessFix external site ownership verification",
+    "APIShield completed analysis worker flow"
+  ],
+  "verification_blocker": {
+    "type": "EXECUTION_NETWORK_POLICY",
+    "host": "agenttest-lab-staging.up.railway.app",
+    "message": "Direct staging HTTPS requests were blocked by policy after the user message; no network bypass attempted"
+  },
+  "cleanup": {
+    "memberships": "Two test memberships set REVOKED in each of five product schemas (10 total); database verified",
+    "provisioning_function": "Disabled; verify_jwt true, returns 410",
+    "auth_sessions": "Logout not tested or confirmed; membership denial guards product access",
+    "credentials": "Temporary local test credentials removed after evidence capture"
+  },
+  "deployments": [
+    {
+      "id": "c8f8dc68-7ddb-47bd-a51a-c2fc75bfb71f",
+      "service_id": "f2d6c578-ffaf-4682-b81a-8bae13d9c7a3",
+      "status": "SUCCESS",
+      "commit": "99b0f637b4be7ca7969ec317ee80a3027c4260f4"
+    },
+    {
+      "id": "ce060120-11fe-48b4-8a22-69357414b3f4",
+      "service_id": "16693650-fec8-48e4-b934-e032dd391808",
+      "status": "SUCCESS",
+      "commit": "7c79228205b403efb5af4f851f35c5eb0b4b50b7"
+    },
+    {
+      "id": "3b45e59c-ba21-45dd-a50a-e577e71f71e8",
+      "service_id": "34688a14-872b-43a5-ab5b-8d2e488c7b5f",
+      "status": "SUCCESS",
+      "commit": "174a95a6280005dbb70733116bde57ae075f2a3f"
+    },
+    {
+      "id": "a8879ab4-4087-4fe1-8bd3-5f68e97dac90",
+      "service_id": "db8b6012-8d48-4cd0-802c-225db1b0a19e",
+      "status": "SUCCESS",
+      "commit": "ee35df991100d0397e30236c185247d7215bd7b5"
+    },
+    {
+      "id": "2fee1eb8-a32c-4f69-8c5d-e6b17ef1dcf7",
+      "service_id": "57d8f010-e38e-4dbe-94bb-05cc5d855229",
+      "status": "SUCCESS",
+      "commit": "0313025ca677269866a1a17ae42b42b53bd4c573"
+    }
+  ],
+  "agenttest_http_observations": [
+    {
+      "method": "GET",
+      "path": "/v1/evaluation-runs/290bbfdd-f975-58e7-8b7d-acc48f3f9b74/cases",
+      "status": 200,
+      "timestamp": "2026-10-09T18:40:41.352171263Z"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/evaluation-runs/290bbfdd-f975-58e7-8b7d-acc48f3f9b74/cases",
+      "status": 200,
+      "timestamp": "2026-10-09T18:40:57.883729669Z"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/evaluation-runs/3d89473f-73e8-5674-b913-a3837f04a74b/comparisons",
+      "status": 201,
+      "timestamp": "2026-10-09T18:41:19.509484912Z"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/comparisons/16285126-aae3-4135-b250-00233960d45c/ci-verdict",
+      "status": 200,
+      "timestamp": "2026-10-09T18:41:38.299486976Z"
+    }
+  ],
+  "product": "accessfix-ai"
+}
