@@ -69,8 +69,13 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
     proposal=store.proposal(TENANT,finding['id'],'a'*40,'c'*64)
     retested,status=store.retest(TENANT,proposal['id'],'a'*40,1)
     assert status=='OK' and retested['version']==2
-    review,status=store.review(TENANT,proposal['id'],USER,'c'*64,'approve','passed',2)
-    assert status=='OK' and review[1]=='APPROVED'
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        reviews=list(pool.map(lambda index:peers[index].review(TENANT,proposal['id'],str(uuid4()),'c'*64,'approve','passed',2),range(2)))
+    assert sorted(result[1] for result in reviews)==['OK','STALE']
+    assert next(result[0] for result in reviews if result[1]=='OK')[1]=='APPROVED'
+    assert store.proposal_get(TENANT,proposal['id'])['version']==3
+    with store.conn(TENANT) as db:
+        assert db.execute('SELECT count(*) FROM reviews WHERE proposal_id=?',(proposal['id'],)).fetchone()[0]==1
     assert store.proposal_get(other,proposal['id']) is None
     next_scan=store.scan(TENANT,SITE,'d'*40,'b'*64)
     assert ScanWorker(store,WorkerConfig(lease_seconds=20,timeout_seconds=30)).run_once()
