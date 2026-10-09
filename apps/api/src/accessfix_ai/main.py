@@ -160,6 +160,8 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
     @app.post("/v1/sites/verification-challenges", status_code=201)
     def challenge(body: Challenge, response: Response, c=Depends(scope("site:verify", store))):
+        if os.getenv("APP_ENV", "development") not in {"development", "test"}:
+            return problem(503, "OWNERSHIP_VERIFIER_NOT_CONFIGURED", "An external ownership verifier is required")
         try:
             origin = validate_origin(body.canonical_origin)
         except ValueError as exc:
@@ -185,6 +187,8 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
     @app.post("/v1/sites/{site_id}/verify")
     def verify(site_id: UUID, body: Verify, c=Depends(scope("site:verify", store))):
+        if os.getenv("APP_ENV", "development") not in {"development", "test"}:
+            return problem(503, "OWNERSHIP_VERIFIER_NOT_CONFIGURED", "An external ownership verifier is required")
         row = store.get_challenge(c["tenant_id"], str(body.challenge_id))
         if (
             not row
