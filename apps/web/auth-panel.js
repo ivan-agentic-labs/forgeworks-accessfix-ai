@@ -3,11 +3,11 @@
   const panel=document.createElement('section');panel.className='panel card forge-session';
   panel.innerHTML='<h2>Masuk ke ForgeWorks</h2><p>Sesi hanya disimpan di halaman ini.</p><form id="forge-login"><label>Email<input id="forge-email" type="email" autocomplete="username" required></label><label>Kata sandi<input id="forge-password" type="password" autocomplete="current-password" required></label><button id="forge-signin" type="submit" disabled>Masuk</button><button id="forge-signout" type="button" hidden>Keluar</button></form><p id="forge-auth-status" role="status" aria-live="polite">Memeriksa konfigurasi login…</p>';
   const main=document.querySelector('main')||document.body;main.insertBefore(panel,main.children[1]||null);
-  const $=id=>document.getElementById(id);let config=null,session=null,timer=null;
+  const $=id=>document.getElementById(id);let config=null,session=null,timer=null,epoch=0;
   const tokenFields=()=>['token','bearer-token'].map($).filter(Boolean);
   const baseFields=()=>['api-base','api-base-url','baseUrl'].map($).filter(Boolean);
   const status=text=>{$('forge-auth-status').textContent=text;};
-  function clearSession(){session=null;delete window.forgeUploadedArtifact;clearTimeout(timer);tokenFields().forEach(input=>{input.value='';});$('forge-signout').hidden=true;$('forge-signin').disabled=!config;window.dispatchEvent(new CustomEvent('forge-session-cleared'));}
+  function clearSession(){epoch+=1;session=null;delete window.forgeUploadedArtifact;clearTimeout(timer);tokenFields().forEach(input=>{input.value='';});$('forge-signout').hidden=true;$('forge-signin').disabled=!config;window.dispatchEvent(new CustomEvent('forge-session-cleared'));}
   function applySession(next){
     session=next;tokenFields().forEach(input=>{input.value=next.access_token;input.readOnly=true;});
     baseFields().forEach(input=>{input.value=location.origin;input.readOnly=true;});
@@ -22,8 +22,8 @@
     if(!response.ok)throw new Error(data.msg||data.error_description||'Permintaan login gagal ('+response.status+').');
     return data;
   }
-  async function refresh(){if(!session)return;try{applySession(await authRequest('token?grant_type=refresh_token',{refresh_token:session.refresh_token}));}catch{clearSession();status('Sesi berakhir. Silakan masuk kembali.');}}
-  $('forge-login').addEventListener('submit',async event=>{event.preventDefault();if(!config)return;$('forge-signin').disabled=true;try{applySession(await authRequest('token?grant_type=password',{email:$('forge-email').value.trim(),password:$('forge-password').value}));}catch(error){$('forge-password').value='';$('forge-signin').disabled=false;status(error.message);}});
+  async function refresh(){const current=session,version=epoch;if(!current)return;try{const next=await authRequest('token?grant_type=refresh_token',{refresh_token:current.refresh_token});if(epoch===version&&session===current)applySession(next);}catch{if(epoch===version&&session===current){clearSession();status('Sesi berakhir. Silakan masuk kembali.');}}}
+  $('forge-login').addEventListener('submit',async event=>{event.preventDefault();if(!config||$('forge-signin').disabled)return;const version=epoch;$('forge-signin').disabled=true;try{const next=await authRequest('token?grant_type=password',{email:$('forge-email').value.trim(),password:$('forge-password').value});if(epoch===version)applySession(next);}catch(error){if(epoch===version){$('forge-password').value='';$('forge-signin').disabled=false;status(error.message);}}});
   $('forge-signout').addEventListener('click',async()=>{const current=session;clearSession();if(!current)return;try{await authRequest('logout?scope=global',{},current.access_token);status('Sudah keluar. Sesi akun dicabut di server.');}catch{status('Sesi halaman ditutup. Logout server belum dapat dikonfirmasi.');}});
   fetch('/v1/auth/config',{cache:'no-store'}).then(response=>response.ok?response.json():null).then(value=>{
     if(!value||!value.enabled){status('Login Supabase belum dikonfigurasi untuk lingkungan ini.');return;}
