@@ -10,19 +10,10 @@ jobs:
   runtime:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_DB: forgeworks_runtime
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: synthetic-disposable-ci-only
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd "pg_isready -U postgres -d forgeworks_runtime"
-          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Start fresh native PostgreSQL 17
+        run: bash scripts/setup_disposable_postgres.sh runtime
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.12'
@@ -30,18 +21,18 @@ jobs:
       - name: Run PostgreSQL fixture scans, worker lease fencing, review and RLS tests
         env:
           G1_DISPOSABLE_DB: 'yes'
-          ACCESSFIX_DISPOSABLE_OWNER_DSN: 'host=127.0.0.1 port=5432 dbname=forgeworks_runtime user=postgres password=synthetic-disposable-ci-only'
+          ACCESSFIX_DISPOSABLE_OWNER_DSN: 'host=127.0.0.1 port=5438 dbname=forgeworks_runtime user=postgres password=synthetic-disposable-ci-only'
         run: python -W error -m pytest tests/integration/test_postgres_runtime.py -q
       - name: Backup and restore fresh disposable database
         env:
-          FW_POSTGRES_SERVICE_ID: ${{ job.services.postgres.id }}
+          PGPASSWORD: synthetic-disposable-ci-only
         run: |
-          docker exec "$FW_POSTGRES_SERVICE_ID" pg_dump -U postgres -d forgeworks_runtime --format=custom > /tmp/forgeworks-runtime.dump
-          docker exec "$FW_POSTGRES_SERVICE_ID" createdb -U postgres forgeworks_restore
-          docker exec -i "$FW_POSTGRES_SERVICE_ID" pg_restore -U postgres -d forgeworks_restore --exit-on-error < /tmp/forgeworks-runtime.dump
+          /usr/lib/postgresql/17/bin/pg_dump -h 127.0.0.1 -p 5438 -U postgres -d forgeworks_runtime --format=custom > /tmp/forgeworks-runtime.dump
+          /usr/lib/postgresql/17/bin/createdb -h 127.0.0.1 -p 5438 -U postgres forgeworks_restore
+          /usr/lib/postgresql/17/bin/pg_restore -h 127.0.0.1 -p 5438 -U postgres -d forgeworks_restore --exit-on-error < /tmp/forgeworks-runtime.dump
       - name: Verify restored logical data and tenant policy
         env:
           G1_DISPOSABLE_DB: 'yes'
-          FW_DISPOSABLE_OWNER_DSN: 'host=127.0.0.1 port=5432 dbname=forgeworks_runtime user=postgres password=synthetic-disposable-ci-only'
+          FW_DISPOSABLE_OWNER_DSN: 'host=127.0.0.1 port=5438 dbname=forgeworks_runtime user=postgres password=synthetic-disposable-ci-only'
           FW_PRODUCT_MODULE: accessfix_ai
         run: python scripts/verify_disposable_restore.py
