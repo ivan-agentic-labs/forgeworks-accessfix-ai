@@ -149,6 +149,11 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         }
         return JSONResponse(status_code=exc.status_code, content=detail)
 
+    @app.get("/v1/auth/config")
+    def auth_config():
+        key=os.getenv("SUPABASE_PUBLISHABLE_KEY","")
+        return {"enabled":os.getenv("AUTH_MODE")=="supabase" and key.startswith("sb_publishable_"), "supabase_url":os.getenv("SUPABASE_URL",""), "publishable_key":key if key.startswith("sb_publishable_") else "", "product":"accessfix-ai", "environment":os.getenv("APP_ENV","development")}
+
     @app.get("/readyz")
     def ready():
         from accessfix_ai.presentation.authentication import readiness
@@ -265,11 +270,15 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         if not scan:
             return problem(404, "RESOURCE_NOT_FOUND", "Scan is not visible")
         items = []
+        # Findings and their immutable source are committed together. Read the
+        # findings first so a worker committing between reads cannot expose a
+        # finding paired with an earlier, missing source snapshot.
+        visible_findings = store.findings(c["tenant_id"], str(scan_id))
         snapshot = store.scan_source(c["tenant_id"], str(scan_id))
         actual = {}
         if snapshot and hashlib.sha256(snapshot["source_html"].encode()).hexdigest() == snapshot["source_sha"]:
             actual = {item["fingerprint"]: item for item in image_alt_findings(snapshot["source_html"].encode())}
-        for finding in store.findings(c["tenant_id"], str(scan_id)):
+        for finding in visible_findings:
             matched = actual.get(finding["fingerprint"])
             items.append(
                 {
@@ -392,6 +401,16 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             "attempt_count": int(row["attempt_count"] or 0),
             "last_error_code": row["last_error_code"],
         }
+
+    @app.get("/", include_in_schema=False)
+    def home():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("/ui/",status_code=307)
+
+    from fastapi.staticfiles import StaticFiles
+    web_dir=ROOT / "apps" / "web"
+    if web_dir.is_dir():
+        app.mount("/ui", StaticFiles(directory=str(web_dir),html=True),name="web-console")
 
     return app
 
