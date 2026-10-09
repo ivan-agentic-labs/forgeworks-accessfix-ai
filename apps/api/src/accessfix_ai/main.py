@@ -347,7 +347,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         return {
             "id": row["job_id"],
             "kind": "accessibility_scan",
-            "state": row["status"],
+            "state": "FAILED_TERMINAL" if row["status"] in {"FAILED", "TIMED_OUT"} else row["status"],
             "created_at": row["created_at"],
             "state_version": 1,
             "attempt_count": int(row["attempt_count"] or 0),

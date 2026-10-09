@@ -32,3 +32,16 @@ jobs:
           G1_DISPOSABLE_DB: 'yes'
           ACCESSFIX_DISPOSABLE_OWNER_DSN: 'host=127.0.0.1 port=5432 dbname=forgeworks_runtime user=postgres password=synthetic-disposable-ci-only'
         run: python -W error -m pytest tests/integration/test_postgres_runtime.py -q
+      - name: Backup and restore fresh disposable database
+        env:
+          FW_POSTGRES_SERVICE_ID: ${{ job.services.postgres.id }}
+        run: |
+          docker exec "$FW_POSTGRES_SERVICE_ID" pg_dump -U postgres -d forgeworks_runtime --format=custom > /tmp/forgeworks-runtime.dump
+          docker exec "$FW_POSTGRES_SERVICE_ID" createdb -U postgres forgeworks_restore
+          docker exec -i "$FW_POSTGRES_SERVICE_ID" pg_restore -U postgres -d forgeworks_restore --exit-on-error < /tmp/forgeworks-runtime.dump
+      - name: Verify restored logical data and tenant policy
+        env:
+          G1_DISPOSABLE_DB: 'yes'
+          FW_DISPOSABLE_OWNER_DSN: 'host=127.0.0.1 port=5432 dbname=forgeworks_runtime user=postgres password=synthetic-disposable-ci-only'
+          FW_PRODUCT_MODULE: accessfix_ai
+        run: python scripts/verify_disposable_restore.py

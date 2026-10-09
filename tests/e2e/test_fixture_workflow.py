@@ -65,7 +65,7 @@ def test_fixture_workflow_ownership_job_findings_proposal_retest_review(tmp_path
             job_response = client.get(f"/v1/jobs/{accepted.json()['job_id']}", headers=auth)
             assert job_response.status_code == 200
             job = job_response.json()
-            if job["state"] in {"SUCCEEDED", "FAILED", "CANCELLED", "TIMED_OUT"}:
+            if job["state"] in {"SUCCEEDED", "FAILED_TERMINAL", "CANCELLED"}:
                 break
             time.sleep(0.01)
         assert job["state"] == "SUCCEEDED"
@@ -158,3 +158,4 @@ def test_remote_origin_is_visible_and_fail_closed_without_queueing(tmp_path):
         assert blocked.json()["code"] == "REMOTE_BROWSER_BLOCKED"
         with client.app.state.store.conn() as connection:
             assert connection.execute("SELECT COUNT(*) FROM scans").fetchone()[0] == 0
+

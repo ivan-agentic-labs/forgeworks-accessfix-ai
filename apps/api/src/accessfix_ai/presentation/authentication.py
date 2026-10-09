@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from urllib.parse import urlsplit
+from uuid import UUID
 
 import jwt
 from fastapi import HTTPException
@@ -56,6 +57,10 @@ def decode_bearer(authorization: str | None) -> dict:
         claims = jwt.decode(token, key, algorithms=[algorithm], issuer=issuer, audience=audience, options={"require": REQUIRED})
         if not isinstance(claims["tenant_id"], str) or not claims["tenant_id"] or not claims["sub"]:
             raise jwt.InvalidTokenError("Missing tenant or subject")
+        try:
+            claims["tenant_id"] = str(UUID(claims["tenant_id"]))
+        except ValueError as error:
+            raise jwt.InvalidTokenError("Tenant claim must be a UUID") from error
         return claims
     except jwt.PyJWKClientConnectionError:
         problem(503, "IDENTITY_PROVIDER_UNAVAILABLE", "Identity key service is unavailable")

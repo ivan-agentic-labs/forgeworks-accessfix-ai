@@ -105,6 +105,15 @@ class PostgresStore(Store):
             if not db.execute("SELECT 1 FROM information_schema.columns WHERE table_name='scan_jobs' AND column_name='lease_until'").fetchone():
                 raise ValueError("Apply migration 002 with the migration role before starting runtime")
 
+    @tenant_method
+    def member(self, tenant, user):
+        try:
+            user = str(UUID(str(user)))
+        except ValueError:
+            return False  # No provisioned UUID identity mapping; fail closed before SQL.
+        with self.conn() as db:
+            return db.execute("SELECT 1 FROM memberships WHERE tenant_id=? AND user_id=? AND status='ACTIVE'", (tenant, user)).fetchone() is not None
+
     @contextmanager
     def conn(self, tenant=None):
         tenant = tenant or TENANT_CONTEXT.get()

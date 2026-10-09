@@ -29,6 +29,7 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
     info.update(user='fw_runtime_test',password='synthetic-local-runtime-test-only');runtime=make_conninfo(**info)
     with pytest.raises(ValueError,match='superuser'):PostgresStore(owner)
     store=PostgresStore(runtime)
+    assert not store.member(TENANT, "unmapped-oidc-subject")
     assert store.member(TENANT,USER) and not store.member(other,USER)
     assert store.site(other,SITE) is None
     with psycopg.connect(runtime) as db:

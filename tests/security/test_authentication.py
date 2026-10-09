@@ -10,7 +10,7 @@ from accessfix_ai.presentation.authentication import decode_bearer, jwks_client
 
 
 def payload():
-    return {"sub": "test-user", "tenant_id": "test-tenant", "scope": "job:read", "iss": "https://issuer.synthetic.invalid", "aud": "forgeworks-api", "exp": int(time.time()) + 60}
+    return {"sub": "test-user", "tenant_id": "00000000-0000-0000-0000-000000000001", "scope": "job:read", "iss": "https://issuer.synthetic.invalid", "aud": "forgeworks-api", "exp": int(time.time()) + 60}
 
 
 def bearer(claims, algorithm="HS256"):
@@ -70,3 +70,10 @@ def test_oidc_key_rotation_and_algorithm_confusion(monkeypatch):
         decode_bearer(bearer(claims))
     assert error.value.status_code == 401
     jwks_client.cache_clear()
+
+
+@pytest.mark.parametrize("tenant", ["not-a-uuid", "", 123])
+def test_invalid_tenant_rejected_before_database(tenant):
+    with pytest.raises(HTTPException) as error:
+        decode_bearer(bearer({**payload(), "tenant_id": tenant}))
+    assert error.value.status_code == 401
