@@ -1,0 +1,20 @@
+{
+  "scope": "exact source commit; no G1-E certification",
+  "application_tests": "29 passed",
+  "slug": "accessfix-ai",
+  "sha": "3e27d8f7569d699e85a69e4eb210deb3901e3d8c",
+  "runs": [
+    {
+      "id": 37883263861,
+      "name": "G1 Contract Verification",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37883263861"
+    },
+    {
+      "id": 37883263893,
+      "name": "AccessFix MVP Application CI",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37883263893"
+    }
+  ]
+}

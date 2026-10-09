@@ -18,7 +18,7 @@ Remote scanning now rejects before DNS lookup when the remote runner is disabled
 
 Structure/sensitive-pattern scans, static contracts, independent OpenAPI validation and generated TypeScript compilation were executed locally. These checks are bounded evidence, not a certification that every possible secret or privacy issue is absent. Test credentials are explicitly synthetic; test signing private keys are generated at runtime.
 
-The test log and GitHub Actions run linked by the delivery report are authoritative for the exact tested SHA. APIShield's local browser run is blocked because the browser download returned an invalid archive; the test remains mandatory in CI. Local PostgreSQL is unavailable; the runtime proof must pass in the dedicated CI service before that adapter is claimed verified.
+The test log and GitHub Actions run linked by the delivery report are authoritative for the exact tested SHA. APIShield's local browser run is blocked because the browser download returned an invalid archive; the test remains mandatory in CI. Local PostgreSQL is unavailable. The dedicated disposable PostgreSQL Actions service passed for the exact source commit recorded below; this does not prove production database operations.
 
 ## Remaining gaps
 
@@ -31,3 +31,12 @@ The test log and GitHub Actions run linked by the delivery report are authoritat
 - Legal/domain/operations/accessibility/cost and independent reviewer acceptance.
 
 G1-E remains OPEN/BLOCKED. No production deployment, customer data, paid provider calls or product auto-merge is introduced.
+
+## GitHub verification receipt
+
+Source commit: `3e27d8f7569d699e85a69e4eb210deb3901e3d8c`. These results cover that exact implementation; later commits require their own workflow results.
+
+Application test result: 29 passed.
+
+- [G1 Contract Verification](https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37883263861): **success**.
+- [AccessFix MVP Application CI](https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/37883263893): **success**.
