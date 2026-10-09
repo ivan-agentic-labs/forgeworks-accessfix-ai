@@ -107,7 +107,7 @@ def test_retest_is_bound_to_proposal_revision(tmp_path):
         proposal = client.post(
             f"/v1/findings/{finding['id']}/fix-proposals",
             headers=headers("patch:create"),
-            json={"source_mapping_id": finding["source_mapping"]["id"]},
+            json={"source_mapping_id": finding["source_mapping"]["id"], "alt_text": "Synthetic fixture illustration"},
         ).json()
         wrong = client.post(
             f"/v1/fix-proposals/{proposal['id']}/retests",

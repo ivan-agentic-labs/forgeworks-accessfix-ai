@@ -18,7 +18,7 @@ def test_verify_scan_findings_and_review(tmp_path):
    if f: break
    time.sleep(.02)
   assert f[0]['rule_id']=='image-alt' and f[0]['manual_check_required'] is True
-  p=c.post(f"/v1/findings/{f[0]['id']}/fix-proposals",headers=hdr('patch:create'),json={'source_mapping_id':f[0]['id']}); assert p.status_code==201
+  p=c.post(f"/v1/findings/{f[0]['id']}/fix-proposals",headers=hdr('patch:create'),json={'source_mapping_id':f[0]['id'], 'alt_text':'Synthetic fixture illustration'}); assert p.status_code==201
   proposal=p.json()
   retest=c.post(f"/v1/fix-proposals/{proposal['id']}/retests",headers=hdr('patch:create'),json={'repo_commit_sha':proposal['base_sha'],'expected_version':proposal['version']}); assert retest.status_code==202
   review=c.post(f"/v1/fix-proposals/{proposal['id']}/reviews",headers=hdr('patch:review'),json={'patch_sha256':proposal['patch_sha256'],'decision':'approve','manual_check_status':'passed','expected_version':retest.json()['version']}); assert review.status_code==201
@@ -35,3 +35,4 @@ def test_cross_tenant_and_scope_fail_closed(tmp_path):
   r=c.post('/v1/sites/verification-challenges',headers=hdr('scan:start'),json={'canonical_origin':'http://fixture.local','repository_id':'33333333-3333-3333-3333-333333333333'}); assert r.status_code==403
   other=jwt.encode({'sub':USER,'tenant_id':'00000000-0000-0000-0000-000000000099','scope':'site:verify','iss':ISS,'aud':AUD,'exp':datetime.now(timezone.utc)+timedelta(minutes=5)},SECRET,algorithm='HS256')
   r=c.post('/v1/sites/verification-challenges',headers={'Authorization':'Bearer '+other},json={'canonical_origin':'http://fixture.local','repository_id':'33333333-3333-3333-3333-333333333333'}); assert r.status_code==403
+

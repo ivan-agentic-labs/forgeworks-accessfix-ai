@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from accessfix_ai.domain.static_html import image_alt_findings, MAX_SOURCE_BYTES
+from accessfix_ai.domain.static_html import image_alt_findings, build_image_alt_patch, MAX_SOURCE_BYTES
 
 TENANT = "00000000-0000-0000-0000-000000000001"
 USER = "00000000-0000-0000-0000-000000000010"
@@ -59,6 +59,7 @@ class Store:
                 CREATE TABLE IF NOT EXISTS scans(tenant_id TEXT,id TEXT,site_id TEXT,commit_sha TEXT,policy_sha TEXT,status TEXT,created_at TEXT,job_id TEXT,attempt_count INTEGER NOT NULL DEFAULT 0,lease_until TEXT,last_error_code TEXT,cancel_requested INTEGER NOT NULL DEFAULT 0,timeout_at TEXT,PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS findings(tenant_id TEXT,id TEXT,scan_id TEXT,rule_id TEXT,severity TEXT,selector TEXT,fingerprint TEXT,manual_required INTEGER,PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS scan_sources(tenant_id TEXT,scan_id TEXT,source_sha TEXT,source_html TEXT,PRIMARY KEY(tenant_id,scan_id));
+                CREATE TABLE IF NOT EXISTS proposal_sources(tenant_id TEXT,proposal_id TEXT,source_sha TEXT,patched_sha TEXT,patch_text TEXT,patched_html TEXT,alt_text TEXT,PRIMARY KEY(tenant_id,proposal_id));
                 CREATE TABLE IF NOT EXISTS proposals(tenant_id TEXT,id TEXT,finding_id TEXT,base_sha TEXT,patch_sha TEXT,status TEXT,retest_status TEXT,version INTEGER,PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS reviews(tenant_id TEXT,id TEXT,proposal_id TEXT,reviewer_id TEXT,decision TEXT,manual_status TEXT,version INTEGER,PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS idempotency_keys(tenant_id TEXT,principal TEXT,action TEXT,key TEXT,request_hash TEXT,resource_id TEXT NOT NULL,response_status INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(tenant_id,principal,action,key));
@@ -232,14 +233,38 @@ class Store:
         with self.conn() as c:
             return c.execute("SELECT * FROM findings WHERE tenant_id=? AND id=?", (tenant, finding_id)).fetchone()
 
-    def proposal(self, tenant: str, finding_id: str, base_sha: str, patch: str):
+    def proposal(self, tenant: str, finding_id: str, base_sha: str, alt_text: str):
         with self.lock, self.conn() as c:
+            if isinstance(c, sqlite3.Connection):
+                c.execute("BEGIN IMMEDIATE")
             existing = c.execute("SELECT * FROM proposals WHERE tenant_id=? AND finding_id=? AND base_sha=?", (tenant, finding_id, base_sha)).fetchone()
             if existing:
+                content = c.execute("SELECT * FROM proposal_sources WHERE tenant_id=? AND proposal_id=?", (tenant, existing["id"])).fetchone()
+                if not content or content["alt_text"] != alt_text:
+                    raise ValueError("Existing proposal has different or unavailable source content")
                 return existing
+            finding = c.execute("SELECT * FROM findings WHERE tenant_id=? AND id=?", (tenant, finding_id)).fetchone()
+            if not finding or not finding["selector"].startswith("img#"):
+                raise ValueError("A unique image source mapping is required")
+            scan = c.execute("SELECT * FROM scans WHERE tenant_id=? AND id=?", (tenant, finding["scan_id"])).fetchone()
+            snapshot = c.execute("SELECT * FROM scan_sources WHERE tenant_id=? AND scan_id=?", (tenant, finding["scan_id"])).fetchone()
+            if not snapshot or not scan or scan["commit_sha"] != base_sha:
+                raise ValueError("Source snapshot or revision is unavailable")
+            source = snapshot["source_html"].encode("utf-8")
+            if hashlib.sha256(source).hexdigest() != snapshot["source_sha"]:
+                raise ValueError("Source snapshot digest mismatch")
+            actual = image_alt_findings(source)
+            if not any(item["fingerprint"] == finding["fingerprint"] and item["selector"] == finding["selector"] for item in actual):
+                raise ValueError("Finding is not bound to the stored source")
+            patch = build_image_alt_patch(source, finding["selector"][4:], alt_text)
             proposal_id = str(uuid.uuid4())
-            c.execute("INSERT INTO proposals VALUES(?,?,?,?,?,?,?,?)", (tenant, proposal_id, finding_id, base_sha, patch, "PENDING_RETEST", "NOT_RUN", 1))
+            c.execute("INSERT INTO proposals VALUES(?,?,?,?,?,?,?,?)", (tenant, proposal_id, finding_id, base_sha, patch["patch_sha256"], "PENDING_RETEST", "NOT_RUN", 1))
+            c.execute("INSERT INTO proposal_sources(tenant_id,proposal_id,source_sha,patched_sha,patch_text,patched_html,alt_text) VALUES(?,?,?,?,?,?,?)", (tenant, proposal_id, patch["source_sha256"], patch["patched_sha256"], patch["patch"], patch["patched_source"].decode("utf-8"), alt_text))
         return self.proposal_get(tenant, proposal_id)
+
+    def proposal_content(self, tenant: str, proposal_id: str):
+        with self.conn() as c:
+            return c.execute("SELECT * FROM proposal_sources WHERE tenant_id=? AND proposal_id=?", (tenant, proposal_id)).fetchone()
 
     def proposal_get(self, tenant: str, proposal_id: str):
         with self.conn() as c:
@@ -247,6 +272,8 @@ class Store:
 
     def retest(self, tenant: str, proposal_id: str, commit_sha: str, expected_version: int):
         with self.lock, self.conn() as c:
+            if isinstance(c, sqlite3.Connection):
+                c.execute("BEGIN IMMEDIATE")
             row = c.execute("SELECT * FROM proposals WHERE tenant_id=? AND id=?", (tenant, proposal_id)).fetchone()
             if not row:
                 return None, "NOT_FOUND"
@@ -254,6 +281,17 @@ class Store:
                 return row, "STALE"
             if row["base_sha"] != commit_sha:
                 return row, "REVISION_MISMATCH"
+            content = c.execute("SELECT * FROM proposal_sources WHERE tenant_id=? AND proposal_id=?", (tenant, proposal_id)).fetchone()
+            finding = c.execute("SELECT * FROM findings WHERE tenant_id=? AND id=?", (tenant, row["finding_id"])).fetchone()
+            source = c.execute("SELECT * FROM scan_sources WHERE tenant_id=? AND scan_id=?", (tenant, finding["scan_id"])).fetchone() if finding else None
+            try:
+                if not content or not source or hashlib.sha256(source["source_html"].encode()).hexdigest() != source["source_sha"]:
+                    raise ValueError("Missing or corrupted source")
+                rebuilt = build_image_alt_patch(source["source_html"].encode(), finding["selector"][4:], content["alt_text"])
+                if rebuilt["source_sha256"] != content["source_sha"] or rebuilt["patched_sha256"] != content["patched_sha"] or rebuilt["patch_sha256"] != row["patch_sha"] or rebuilt["patch"] != content["patch_text"] or rebuilt["patched_source"].decode() != content["patched_html"]:
+                    raise ValueError("Patch integrity mismatch")
+            except (ValueError, TypeError):
+                return row, "SOURCE_INTEGRITY_FAILED"
             changed = c.execute("UPDATE proposals SET retest_status='PASSED',status='PENDING_REVIEW',version=version+1 WHERE tenant_id=? AND id=? AND version=? AND status='PENDING_RETEST'", (tenant, proposal_id, expected_version)).rowcount
             if not changed:
                 return row, "STALE"

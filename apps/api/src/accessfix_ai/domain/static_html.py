@@ -58,7 +58,7 @@ def image_alt_findings(source: bytes) -> list[dict]:
         # ordinal is not a valid CSS nth-of-type position across different parents.
         selector = "img#" + identifier if safe_id and parser.ids[identifier] == 1 else "img"
         fingerprint = hashlib.sha256(json.dumps([source_sha, "image-alt", index, snippet], ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
-        findings.append({"rule_id": "image-alt", "severity": "SERIOUS", "selector": selector, "fingerprint": fingerprint, "manual_required": 1})
+        findings.append({"rule_id": "image-alt", "severity": "SERIOUS", "selector": selector, "fingerprint": fingerprint, "manual_required": 1, "evidence_sha256": hashlib.sha256(snippet.encode()).hexdigest()})
     return findings
 
 

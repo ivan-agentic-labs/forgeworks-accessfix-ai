@@ -14,6 +14,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
+from accessfix_ai.domain.static_html import image_alt_findings
 
 from accessfix_ai.domain.target_policy import (
     MAX_SCAN_PATH_LENGTH,
@@ -51,6 +52,7 @@ class StartScan(BaseModel):
 class CreateFix(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source_mapping_id: UUID
+    alt_text: str = Field(min_length=1, max_length=500)
 
 
 class Retest(BaseModel):
@@ -246,8 +248,12 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         if not scan:
             return problem(404, "RESOURCE_NOT_FOUND", "Scan is not visible")
         items = []
+        snapshot = store.scan_source(c["tenant_id"], str(scan_id))
+        actual = {}
+        if snapshot and hashlib.sha256(snapshot["source_html"].encode()).hexdigest() == snapshot["source_sha"]:
+            actual = {item["fingerprint"]: item for item in image_alt_findings(snapshot["source_html"].encode())}
         for finding in store.findings(c["tenant_id"], str(scan_id)):
-            evidence_text = f"{scan['site_id']}:{finding['selector']}:{finding['rule_id']}"
+            matched = actual.get(finding["fingerprint"])
             items.append(
                 {
                     "id": finding["id"],
@@ -259,12 +265,14 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
                     "manual_check_required": bool(finding["manual_required"]),
                     "evidence": {
                         "kind": "DOM_SNIPPET",
-                        "digest_sha256": hashlib.sha256(evidence_text.encode()).hexdigest(),
+                        "digest_sha256": matched["evidence_sha256"] if matched else finding["fingerprint"],
                     },
                     "source_mapping": {
                         "id": finding["id"],
-                        "verified": True,
+                        "verified": bool(matched and finding["selector"].startswith("img#")),
                         "source_revision": scan["commit_sha"],
+                        "revision_verified": False,
+                        "source_kind": "LOCAL_FIXTURE",
                     },
                 }
             )
@@ -276,10 +284,10 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         if not finding or str(body.source_mapping_id) != str(finding_id):
             return problem(409, "SOURCE_MAPPING_UNAVAILABLE", "Finding has no verified source mapping")
         scan = store.get_scan(c["tenant_id"], finding["scan_id"])
-        patch = hashlib.sha256(
-            (finding["selector"] + "|add alt text|" + finding["fingerprint"]).encode()
-        ).hexdigest()
-        row = store.proposal(c["tenant_id"], str(finding_id), scan["commit_sha"], patch)
+        try:
+            row = store.proposal(c["tenant_id"], str(finding_id), scan["commit_sha"], body.alt_text)
+        except ValueError as exc:
+            return problem(409, "SOURCE_MAPPING_UNAVAILABLE", str(exc))
         return {
             "id": row["id"],
             "status": row["status"],
@@ -287,6 +295,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             "finding_id": row["finding_id"],
             "base_sha": row["base_sha"],
             "patch_sha256": row["patch_sha"],
+            "patch": store.proposal_content(c["tenant_id"], row["id"])["patch_text"],
             "retest_status": row["retest_status"],
             "version": row["version"],
         }
@@ -300,6 +309,8 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             return problem(409, "STALE_VERSION", "Proposal version is stale")
         if status == "REVISION_MISMATCH":
             return problem(409, "REVISION_MISMATCH", "Retest must use the proposal base revision")
+        if status == "SOURCE_INTEGRITY_FAILED":
+            return problem(409, "SOURCE_INTEGRITY_FAILED", "Stored source or patch failed integrity and static retest")
         return {
             "id": str(proposal_id),
             "status": "ACCEPTED",

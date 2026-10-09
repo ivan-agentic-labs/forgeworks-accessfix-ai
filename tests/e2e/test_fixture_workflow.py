@@ -77,7 +77,7 @@ def test_fixture_workflow_ownership_job_findings_proposal_retest_review(tmp_path
         assert len(items) == 1
         assert items[0]["manual_check_required"] is True
 
-        proposal_payload = {"source_mapping_id": items[0]["source_mapping"]["id"]}
+        proposal_payload = {"source_mapping_id": items[0]["source_mapping"]["id"], "alt_text": "Synthetic fixture illustration"}
         proposal = client.post(f"/v1/findings/{items[0]['id']}/fix-proposals", headers=auth, json=proposal_payload)
         duplicate_proposal = client.post(f"/v1/findings/{items[0]['id']}/fix-proposals", headers=auth, json=proposal_payload)
         assert proposal.status_code == duplicate_proposal.status_code == 201

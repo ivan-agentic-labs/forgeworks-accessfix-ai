@@ -40,7 +40,7 @@ def test_independent_adapters_allow_exactly_one_review(tmp_path):
     assert store.retest(TENANT, proposal["id"], REPO, 1)[1] == "OK"
     adapters = [Store(store.path), Store(store.path)]
     def approve(index):
-        return adapters[index].review(TENANT, proposal["id"], f"reviewer-{index}", "patch", "approve", "passed", 2)[1]
+        return adapters[index].review(TENANT, proposal["id"], f"reviewer-{index}", proposal["patch_sha"], "approve", "passed", 2)[1]
     with ThreadPoolExecutor(max_workers=2) as pool:
         assert sorted(pool.map(approve, range(2))) == ["OK", "STALE"]
     assert store.proposal_get(TENANT, proposal["id"])["version"] == 3

@@ -177,7 +177,7 @@ async function runFlow() {
     const proposal = await request(`/v1/findings/${finding.id}/fix-proposals`, {
       method: "POST",
       headers: { "Idempotency-Key": key("proposal") },
-      body: json({ source_mapping_id: finding.source_mapping.id }),
+      body: json({ source_mapping_id: finding.source_mapping.id, alt_text: $("#alt-text").value }),
     });
 
     setStep("retest", "Queueing base-revision retest", "running");
@@ -216,3 +216,4 @@ $("#dismiss-error").addEventListener("click", clearError);
 $("#repo-sha").addEventListener("change", () => {
   if (!$("#repo-sha").value.trim()) $("#repo-sha").value = DEFAULT_COMMIT;
 });
+
