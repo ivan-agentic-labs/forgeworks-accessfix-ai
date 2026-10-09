@@ -1,0 +1,20 @@
+name: AccessFix MVP Application CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: {python-version: '3.12'}
+      - run: python -m pip install -e 'apps/api[test]' -r scripts/requirements-verification.txt
+      - run: python -m pytest tests/unit tests/integration
+      - run: python scripts/verify_bootstrap.py && python scripts/verify_contracts.py && python scripts/validate_openapi_independent.py
+      - run: bash -n scripts/probe_disposable_postgres.sh

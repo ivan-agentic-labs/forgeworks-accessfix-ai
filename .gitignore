@@ -1,4 +1,5 @@
 # credentials and local runtime files
+.runtime/
 .env
 .env.*
 !.env.example
@@ -11,5 +12,6 @@ node_modules/
 .next/
 dist/
 build/
+*.egg-info/
 *.log
 .DS_Store
