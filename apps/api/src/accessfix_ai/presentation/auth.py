@@ -1,4 +1,4 @@
-from accessfix_ai.presentation.authentication import decode_bearer
+from accessfix_ai.presentation.authentication import decode_bearer, verify_session
 import os, jwt
 from fastapi import Depends, Header, HTTPException
 from typing import Annotated
@@ -11,6 +11,7 @@ def claims(authorization: Annotated[str | None, Header()] = None):
 
 def scope(required,store:Store):
  def dep(c=Depends(claims)):
+  verify_session(store, c)
   if not c.get('tenant_id') or not c.get('sub') or not store.member(c['tenant_id'],c['sub']): reject(403,'TENANT_CONTEXT_INVALID','Verified membership is required')
   if required not in set(str(c.get('scope','')).split()): reject(403,'INSUFFICIENT_SCOPE',f'Scope {required} is required')
   return c

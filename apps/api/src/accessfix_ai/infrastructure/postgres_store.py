@@ -114,6 +114,13 @@ class PostgresStore(Store):
                 raise ValueError("Runtime must not own product source tables")
 
     @tenant_method
+    def session_active(self, tenant, user, session_id):
+        with self.conn() as db:
+            db.execute("SELECT set_config('request.jwt.claim.sub', ?, true)", (str(UUID(user)),))
+            row = db.execute("SELECT session_active(?, ?) AS active", (str(UUID(session_id)), str(UUID(user)))).fetchone()
+            return bool(row["active"])
+
+    @tenant_method
     def member(self, tenant, user):
         try:
             user = str(UUID(str(user)))

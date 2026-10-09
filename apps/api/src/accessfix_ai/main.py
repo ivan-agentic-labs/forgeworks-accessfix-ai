@@ -149,6 +149,11 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         }
         return JSONResponse(status_code=exc.status_code, content=detail)
 
+    @app.get("/readyz")
+    def ready():
+        from accessfix_ai.presentation.authentication import readiness
+        return readiness(store)
+
     @app.get("/healthz")
     def health():
         return {"status": "ok", "service": "accessfix-ai"}

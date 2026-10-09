@@ -1,0 +1,14 @@
+{
+  "product": "accessfix-ai",
+  "scope": "connected staging preparation; no production acceptance",
+  "local_runtime_lock_tests": {
+    "passed": 101,
+    "skipped": 2,
+    "browser_tests": "excluded"
+  },
+  "offline_supabase_tests": 38,
+  "supabase_project": "fljekuwplgkrpdoajyhn",
+  "railway_project": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
+  "live_authenticated_user_tests": "not run; no application users provisioned",
+  "live_role_switched_negative_proof": "not accepted; connector returned Invalid or expired requestState"
+}

@@ -9,6 +9,8 @@ from uuid import UUID
 import jwt
 from fastapi import HTTPException
 
+PRODUCT = "accessfix-ai"
+
 REQUIRED = ["exp", "iss", "aud", "sub", "tenant_id"]
 
 
@@ -26,6 +28,15 @@ def configuration():
         if environment not in {"development", "test"} or len(secret.encode()) < 32 or not issuer or not audience:
             problem(503, "AUTH_NOT_CONFIGURED", "Explicit development configuration is required; development auth is forbidden outside test/development")
         return mode, issuer, audience, secret
+    if mode == "supabase":
+        base = os.getenv("SUPABASE_URL", "").rstrip("/")
+        parsed = urlsplit(base)
+        if (parsed.scheme != "https" or not parsed.hostname
+                or not parsed.hostname.endswith(".supabase.co")
+                or parsed.username or parsed.password or parsed.port
+                or parsed.path or parsed.query or parsed.fragment):
+            problem(503, "AUTH_NOT_CONFIGURED", "SUPABASE_URL must be a hosted HTTPS project origin")
+        return mode, base + "/auth/v1", "authenticated", base + "/auth/v1/.well-known/jwks.json"
     if mode != "oidc":
         problem(503, "AUTH_NOT_CONFIGURED", "Unsupported authentication mode")
     jwks_url = os.getenv("AUTH_JWKS_URL", "")
@@ -50,11 +61,30 @@ def decode_bearer(authorization: str | None) -> dict:
     mode, issuer, audience, material = configuration()
     token = authorization[7:]
     try:
-        algorithm = "HS256" if mode == "development" else "RS256"
-        if jwt.get_unverified_header(token).get("alg") != algorithm:
+        algorithm = jwt.get_unverified_header(token).get("alg")
+        allowed = ["HS256"] if mode == "development" else ["ES256", "RS256"] if mode == "supabase" else ["RS256"]
+        if algorithm not in allowed:
             raise jwt.InvalidAlgorithmError("Unexpected algorithm")
         key = material if mode == "development" else jwks_client(material).get_signing_key_from_jwt(token).key
-        claims = jwt.decode(token, key, algorithms=[algorithm], issuer=issuer, audience=audience, options={"require": REQUIRED})
+        required = ["exp", "iat", "iss", "aud", "sub", "role", "session_id", "is_anonymous"] if mode == "supabase" else REQUIRED
+        claims = jwt.decode(token, key, algorithms=allowed, issuer=issuer, audience=audience, options={"require": required})
+        if mode == "supabase":
+            # Ignore user_metadata and top-level application claims entirely.
+            if claims["role"] != "authenticated" or claims["is_anonymous"] is not False:
+                raise jwt.InvalidTokenError("A non-anonymous user session is required")
+            claims["sub"] = str(UUID(claims["sub"]))
+            claims["session_id"] = str(UUID(claims["session_id"]))
+            metadata = claims.get("app_metadata")
+            grants = metadata.get("forgeworks") if isinstance(metadata, dict) else None
+            grant = grants.get(PRODUCT) if isinstance(grants, dict) else None
+            if not isinstance(grant, dict):
+                raise jwt.InvalidTokenError("Server-provisioned product grant is required")
+            scopes = grant.get("scopes")
+            if not isinstance(scopes, list) or len(scopes) > 64 or any(not isinstance(s, str) or not s or any(c.isspace() for c in s) or len(s) > 100 for s in scopes):
+                raise jwt.InvalidTokenError("Invalid product scopes")
+            claims["tenant_id"] = grant.get("tenant_id")
+            claims["scope"] = " ".join(scopes)
+            claims["_supabase_session"] = True
         if not isinstance(claims["tenant_id"], str) or not claims["tenant_id"] or not claims["sub"]:
             raise jwt.InvalidTokenError("Missing tenant or subject")
         try:
@@ -64,5 +94,40 @@ def decode_bearer(authorization: str | None) -> dict:
         return claims
     except jwt.PyJWKClientConnectionError:
         problem(503, "IDENTITY_PROVIDER_UNAVAILABLE", "Identity key service is unavailable")
-    except jwt.PyJWTError:
+    except (jwt.PyJWTError, ValueError, TypeError, AttributeError):
         problem(401, "INVALID_TOKEN", "Token signature or required claims are invalid")
+
+
+def verify_session(store, claims: dict) -> None:
+    """Online revocation check in addition to signature/expiry and membership."""
+    if not claims.get("_supabase_session"):
+        return
+    check = getattr(store, "session_active", None)
+    if check is None:
+        problem(503, "SESSION_CHECK_UNAVAILABLE", "A PostgreSQL session verifier is required")
+    try:
+        active = check(claims["tenant_id"], claims["sub"], claims["session_id"])
+    except Exception:
+        problem(503, "SESSION_CHECK_UNAVAILABLE", "Session verification is unavailable")
+    if not active:
+        problem(401, "SESSION_REVOKED", "The user session is inactive")
+
+
+def readiness(store) -> dict:
+    """Configuration, public signing keys and current database connectivity."""
+    mode, _, _, material = configuration()
+    try:
+        if mode != "development":
+            jwks_client(material).get_signing_keys()
+        dsn = getattr(store, "dsn", None)
+        if os.getenv("APP_ENV", "development") not in {"development", "test"} and not dsn:
+            problem(503, "NOT_READY", "PostgreSQL is required outside development/test")
+        if dsn:
+            import psycopg
+            with psycopg.connect(dsn, connect_timeout=5) as db:
+                db.execute("SELECT 1")
+        return {"status": "ready"}
+    except HTTPException:
+        raise
+    except Exception:
+        problem(503, "NOT_READY", "Identity keys or database are unavailable")
