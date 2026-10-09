@@ -104,6 +104,10 @@ class PostgresStore(Store):
                 raise ValueError("Tenant group role must be NOLOGIN, NOSUPERUSER and NOBYPASSRLS")
             if not db.execute("SELECT 1 FROM information_schema.columns WHERE table_name='scan_jobs' AND column_name='lease_until'").fetchone():
                 raise ValueError("Apply migration 002 with the migration role before starting runtime")
+            if not db.execute("SELECT 1 FROM information_schema.tables WHERE table_name='scan_sources'").fetchone():
+                raise ValueError("Apply migration 003 before starting runtime")
+            if db.execute("SELECT 1 FROM pg_tables WHERE schemaname=current_schema() AND tablename='scan_sources' AND tableowner IN (current_user, %s)", (ROLE,)).fetchone():
+                raise ValueError("Runtime must not own product source tables")
 
     @tenant_method
     def member(self, tenant, user):

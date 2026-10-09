@@ -63,6 +63,11 @@ def test_duplicate_scan_idempotency_and_no_duplicate_findings_or_proposals(tmp_p
     assert len(store.findings(TENANT, first["id"])) == 1
     assert store.complete_scan(TENANT, first["id"]) is False
     finding = store.findings(TENANT, first["id"])[0]
+    snapshot = store.scan_source(TENANT, first["id"])
+    assert snapshot["source_html"].startswith("<!doctype html>")
+    import hashlib
+    assert snapshot["source_sha"] == hashlib.sha256(snapshot["source_html"].encode()).hexdigest()
+    assert store.scan_source("00000000-0000-0000-0000-000000000099", first["id"]) is None
     proposal = store.proposal(TENANT, finding["id"], REPO, "patch-digest")
     duplicate_proposal = store.proposal(TENANT, finding["id"], REPO, "patch-digest")
     assert proposal["id"] == duplicate_proposal["id"]

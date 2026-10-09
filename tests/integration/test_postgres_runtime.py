@@ -19,7 +19,7 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
     root=Path(__file__).resolve().parents[2];other=str(uuid4())
     with psycopg.connect(owner) as db:
         if db.execute("SELECT to_regclass('sites')").fetchone()[0]:pytest.fail('Proof requires a fresh empty database')
-        for name in ['001_accessfix_mvp.sql','002_accessfix_runtime.sql']:db.execute((root/'migrations/versions'/name).read_text())
+        for name in ['001_accessfix_mvp.sql','002_accessfix_runtime.sql','003_accessfix_source_snapshots.sql']:db.execute((root/'migrations/versions'/name).read_text())
         db.execute("CREATE ROLE fw_runtime_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'synthetic-local-runtime-test-only'")
         db.execute('GRANT fw_accessfix_ai_rw TO fw_runtime_test')
         db.execute('INSERT INTO tenants VALUES(%s,%s,%s)',(TENANT,'synthetic-demo','ACTIVE'))
@@ -65,6 +65,11 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
     newer=store.claim_scan(20,30)
     assert not store.complete_scan(TENANT,scan_id,old['lease_until'])
     assert store.complete_scan(TENANT,scan_id,newer['lease_until'])
+    assert store.scan_source(TENANT,scan_id)['source_html'].startswith('<!doctype html>')
+    assert store.scan_source(other,scan_id) is None
+    with store.conn(TENANT) as db:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            db.execute('UPDATE scan_sources SET source_html=? WHERE scan_id=?',('tampered',scan_id))
     finding=store.findings(TENANT,scan_id)[0]
     proposal=store.proposal(TENANT,finding['id'],'a'*40,'c'*64)
     retested,status=store.retest(TENANT,proposal['id'],'a'*40,1)

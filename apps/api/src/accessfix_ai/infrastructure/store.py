@@ -58,6 +58,7 @@ class Store:
                 CREATE TABLE IF NOT EXISTS challenges(tenant_id TEXT,id TEXT,site_id TEXT,token_hash TEXT,expires_at TEXT,used_at TEXT,PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS scans(tenant_id TEXT,id TEXT,site_id TEXT,commit_sha TEXT,policy_sha TEXT,status TEXT,created_at TEXT,job_id TEXT,attempt_count INTEGER NOT NULL DEFAULT 0,lease_until TEXT,last_error_code TEXT,cancel_requested INTEGER NOT NULL DEFAULT 0,timeout_at TEXT,PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS findings(tenant_id TEXT,id TEXT,scan_id TEXT,rule_id TEXT,severity TEXT,selector TEXT,fingerprint TEXT,manual_required INTEGER,PRIMARY KEY(tenant_id,id));
+                CREATE TABLE IF NOT EXISTS scan_sources(tenant_id TEXT,scan_id TEXT,source_sha TEXT,source_html TEXT,PRIMARY KEY(tenant_id,scan_id));
                 CREATE TABLE IF NOT EXISTS proposals(tenant_id TEXT,id TEXT,finding_id TEXT,base_sha TEXT,patch_sha TEXT,status TEXT,retest_status TEXT,version INTEGER,PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS reviews(tenant_id TEXT,id TEXT,proposal_id TEXT,reviewer_id TEXT,decision TEXT,manual_status TEXT,version INTEGER,PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS idempotency_keys(tenant_id TEXT,principal TEXT,action TEXT,key TEXT,request_hash TEXT,resource_id TEXT NOT NULL,response_status INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(tenant_id,principal,action,key));
@@ -181,17 +182,23 @@ class Store:
                 return False
             fixture = Path(__file__).resolve().parents[5] / "fixtures/golden/fixture.html"
             with fixture.open("rb") as source:
-                findings = image_alt_findings(source.read(MAX_SOURCE_BYTES + 1))
+                source_bytes = source.read(MAX_SOURCE_BYTES + 1)
+                findings = image_alt_findings(source_bytes)
             lease_clause = " AND lease_until=?" if lease_until is not None else ""
             values = (tenant, scan_id, lease_until) if lease_until is not None else (tenant, scan_id)
             changed = c.execute(f"UPDATE scans SET status='SUCCEEDED',lease_until=NULL,timeout_at=NULL WHERE tenant_id=? AND id=? AND status IN ('PENDING','RUNNING'){lease_clause}", values).rowcount
             if changed == 1:
+                c.execute("INSERT INTO scan_sources(tenant_id,scan_id,source_sha,source_html) VALUES(?,?,?,?)", (tenant, scan_id, hashlib.sha256(source_bytes).hexdigest(), source_bytes.decode("utf-8")))
                 for finding in findings:
                     c.execute("INSERT OR IGNORE INTO findings VALUES(?,?,?,?,?,?,?,?)", (tenant, str(uuid.uuid4()), scan_id, finding["rule_id"], finding["severity"], finding["selector"], finding["fingerprint"], finding["manual_required"]))
             return changed == 1
 
     def finish_scan(self, tenant: str, scan_id: str) -> None:
         self.complete_scan(tenant, scan_id)
+
+    def scan_source(self, tenant: str, scan_id: str):
+        with self.conn() as c:
+            return c.execute("SELECT * FROM scan_sources WHERE tenant_id=? AND scan_id=?", (tenant, scan_id)).fetchone()
 
     def fail_scan(self, tenant: str, scan_id: str, error_code: str, *, max_attempts: int = 3, lease_until: str | None = None) -> str:
         with self.lock, self.conn() as c:

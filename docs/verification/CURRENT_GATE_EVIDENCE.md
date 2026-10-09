@@ -30,6 +30,8 @@ Source: `65bc8f36e594e8f84b0b1b2403cee6b67e8ecd50`. This immutable receipt cover
 
 ### Continuation on 2026-10-09
 
+Successful scans now atomically persist the exact local HTML bytes (UTF-8 text) and SHA-256 in tenant-scoped `scan_sources`. PostgreSQL migration 003 grants the runtime only SELECT/INSERT with forced RLS and tenant-qualified scan foreign keys; runtime startup requires the migration and rejects runtime ownership. Failed, terminal and stale callbacks do not insert snapshots. These local fixture snapshots do not establish that an arbitrary requested Git commit contains those bytes. API proposal integration is still pending.
+
 The domain patch engine now repairs a uniquely identified missing-alt image with explicitly supplied owner text, escapes HTML attribute content, preserves surrounding UTF-8 source, returns real unified diff/source/patch digests, and statically retests the resulting bytes. Ambiguous IDs, duplicate attributes, existing alt, empty/oversized/control-character labels fail closed. This engine is not yet wired to durable proposal snapshots or the API; API proposal/retest responses remain fixture scaffolding until that integration is completed. Semantic appropriateness of alt text still requires human review.
 
 The local worker now reads bounded UTF-8 HTML fixture bytes and evaluates missing image-alt attributes, rather than inserting a hardcoded finding. Fingerprints bind the exact source digest, rule, image ordinal and raw opening tag. Duplicate image attributes, NUL, invalid UTF-8 and oversized/over-budget input fail closed. Unique safe IDs produce precise selectors; other images use a broad selector, not a fabricated source location. Empty alt is preserved as intentional decoration, not certified semantically correct.
