@@ -16,6 +16,10 @@ class StubStore:
 
 @pytest.mark.parametrize(("role", "permission", "expected"), [
     ("viewer", "job:read", True),
+    ("VIEWER", "job:read", True),
+    ("VIEWER", "artifact:create", False),
+    ("OWNER", "artifact:create", True),
+    ("REVOKED", "job:read", False),
     ("viewer", "site:verify", False),
     ("viewer", "fix:review", False),
     ("editor", "site:verify", True),
