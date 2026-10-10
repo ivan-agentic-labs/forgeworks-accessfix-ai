@@ -45,6 +45,7 @@ def test_declared_oversize_rejected_before_body_read():
 def test_duplicate_and_malformed_content_length_rejected():
     assert exercise([b"x"], headers=[(b"content-length", b"1"), (b"content-length", b"1")]) == (400, [])
     assert exercise([b"x"], headers=[(b"content-length", b"NaN")]) == (400, [])
+    assert exercise([b"x"], headers=[(b"content-length", b"9" * 5000)]) == (400, [])
 
 
 def test_empty_chunk_flood_is_bounded():
