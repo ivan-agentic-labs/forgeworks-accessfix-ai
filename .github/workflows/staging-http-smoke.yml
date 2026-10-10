@@ -1,0 +1,25 @@
+name: AccessFix Staging Public Readiness
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  staging-http:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Verify public liveness and readiness without credentials
+        env:
+          BASE_URL: https://accessfix-ai-staging.up.railway.app
+        shell: bash
+        run: |
+          set -euo pipefail
+          for item in "healthz ok" "readyz ready"; do
+            read -r endpoint expected <<< "$item"
+            printf 'Checking /%s\n' "$endpoint"
+            curl --fail --silent --show-error --max-time 20 --connect-timeout 10 --retry 2 --max-filesize 4096 "$BASE_URL/$endpoint" |
+              python -c 'import json,sys; expected=sys.argv[1]; obj=json.load(sys.stdin); assert isinstance(obj,dict) and obj.get("status")==expected, "Unexpected staging readiness state"' "$expected"
+          done
+          echo "Public staging liveness/readiness response verified; this does not prove authenticated product acceptance."
