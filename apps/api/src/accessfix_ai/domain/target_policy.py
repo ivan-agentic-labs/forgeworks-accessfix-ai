@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import os
 import socket
 from collections.abc import Callable, Iterable
 from urllib.parse import urlparse
@@ -63,7 +64,7 @@ def validate_origin(origin: str, allow_fixture: bool = True) -> str:
         p.port  # Force malformed port numbers to fail at the validation boundary.
     except ValueError as exc:
         raise ValueError("invalid HTTPS origin port") from exc
-    if allow_fixture and p.hostname == "fixture.local" and p.scheme == "http":
+    if allow_fixture and os.getenv("APP_ENV", "development") in {"development", "test"} and p.hostname == "fixture.local" and p.scheme == "http":
         if p.username or p.password or p.path not in ("", "/") or p.query or p.fragment or p.port:
             raise ValueError("only canonical fixture origins are allowed")
         return origin.rstrip("/")
