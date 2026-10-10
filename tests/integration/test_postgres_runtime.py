@@ -23,6 +23,9 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
         db.execute((root/'infra/environments/staging/003_fk_lookup_index.sql').read_text())
         definition = db.execute("SELECT pg_get_indexdef('idx_scan_jobs_tenant_site'::regclass)").fetchone()[0]
         assert 'scan_jobs USING btree (tenant_id, site_id)' in definition
+        db.execute((root/'infra/environments/staging/004_sites_rls_initplan.sql').read_text())
+        policy = db.execute("SELECT qual, with_check FROM pg_policies WHERE schemaname=current_schema() AND tablename='sites' AND policyname='sites_tenant'").fetchone()
+        assert policy and all('SELECT' in predicate.upper() for predicate in policy)
         db.execute("CREATE ROLE fw_runtime_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'synthetic-local-runtime-test-only'")
         db.execute('GRANT fw_accessfix_ai_rw TO fw_runtime_test')
         db.execute('INSERT INTO tenants VALUES(%s,%s,%s)',(TENANT,'synthetic-demo','ACTIVE'))

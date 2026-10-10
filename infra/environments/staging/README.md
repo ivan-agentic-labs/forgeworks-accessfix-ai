@@ -44,3 +44,10 @@ See `docs/evidence/STAGING_DEPLOYMENT_2026-10-10.json` for deployment IDs, sourc
 ## Additive foreign-key index rollout
 
 After bootstrap, execute `003_fk_lookup_index.sql` using the migration role with `search_path` set to `fw_accessfix_ai, pg_catalog`. Verify `idx_scan_jobs_tenant_site` on `scan_jobs (tenant_id, site_id)`, rerun the Supabase advisor, and retain rollback: `DROP INDEX IF EXISTS fw_accessfix_ai.idx_scan_jobs_tenant_site;` (only after query-plan review). This closes one index finding, **not** a measured application latency requirement.
+
+## AccessFix sites RLS policy performance change
+
+After independent review, apply `004_sites_rls_initplan.sql` through the migration role using `search_path=fw_accessfix_ai,pg_catalog`. This is an **ALTER POLICY** with the same tenant_id equality predicate, but evaluates `current_setting('app.tenant_id',true)` using a PostgreSQL initPlan. Verify the resulting `pg_policies.qual` and `with_check`, rerun the Supabase advisor, and retain the disposable PostgreSQL RLS negative tests as the security regression proof. Do not claim latency gains without a workload benchmark.
+
+Rollback requires separately reviewed restoration of the original policy predicate:
+`ALTER POLICY sites_tenant ON fw_accessfix_ai.sites USING (tenant_id = nullif(current_setting('app.tenant_id', true),'')::uuid) WITH CHECK (tenant_id = nullif(current_setting('app.tenant_id',true),'')::uuid);`.
