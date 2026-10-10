@@ -33,6 +33,11 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
         policy = db.execute("SELECT qual, with_check FROM pg_policies WHERE schemaname=current_schema() AND tablename='sites' AND policyname='sites_tenant'").fetchone()
         assert policy and all('SELECT' in predicate.upper() for predicate in policy)
         assert all('SELECT current_setting' in predicate for predicate in policy)
+        # Run twice to prove replay safety, then inspect actual catalog definitions.
+        for _ in range(2):
+            db.execute((root/'infra/environments/staging/007_remaining_fk_indexes.sql').read_text())
+        definition = db.execute("SELECT pg_get_indexdef('idx_verification_challenges_tenant_site'::regclass)").fetchone()[0]
+        assert 'verification_challenges USING btree (tenant_id, site_id)' in definition
         db.execute("CREATE ROLE fw_runtime_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'synthetic-local-runtime-test-only'")
         db.execute('GRANT fw_accessfix_ai_rw TO fw_runtime_test')
         db.execute('INSERT INTO tenants VALUES(%s,%s,%s)',(TENANT,'synthetic-demo','ACTIVE'))
