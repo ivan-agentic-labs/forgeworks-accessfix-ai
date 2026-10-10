@@ -28,6 +28,8 @@ from accessfix_ai.infrastructure.store import IdempotencyConflict, SITE, TENANT,
 from accessfix_ai.presentation.auth import scope
 from accessfix_ai.worker import ScanWorker, WorkerConfig
 
+from accessfix_ai.presentation.body_budget import BodyBudgetMiddleware
+
 ROOT = Path(__file__).resolve().parents[4]
 
 
@@ -120,6 +122,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         thread.join(1)
 
     app = FastAPI(title="AccessFix AI MVP", version="0.1.0", lifespan=lifespan)
+    app.add_middleware(BodyBudgetMiddleware)
     # The static fixture console is intentionally local-only. Never use a wildcard
     # origin or allow credentials here; production identity remains a future BFF.
     ui_origins = [
