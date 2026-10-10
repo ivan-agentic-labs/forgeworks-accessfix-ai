@@ -25,6 +25,11 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
         assert 'scan_jobs USING btree (tenant_id, site_id)' in definition
         db.execute((root/'infra/environments/staging/004_sites_rls_initplan.sql').read_text())
         db.execute((root/'infra/environments/staging/005_sites_rls_current_setting_initplan.sql').read_text())
+        db.execute((root/'infra/environments/staging/006_remaining_tenant_rls_initplans.sql').read_text())
+        for table, policy_name in [['findings','findings_tenant'],['idempotency_keys','tenant_boundary'],['memberships','tenant_boundary'],['proposal_sources','tenant_boundary'],['proposals','tenant_boundary'],['reviews','tenant_boundary'],['scan_jobs','scan_jobs_tenant'],['scan_sources','tenant_boundary'],['verification_challenges','tenant_boundary']]:
+            row = db.execute("SELECT qual, with_check FROM pg_policies WHERE schemaname=current_schema() AND tablename=%s AND policyname=%s", (table, policy_name)).fetchone()
+            assert row and all('SELECT current_setting' in clause for clause in row)
+
         policy = db.execute("SELECT qual, with_check FROM pg_policies WHERE schemaname=current_schema() AND tablename='sites' AND policyname='sites_tenant'").fetchone()
         assert policy and all('SELECT' in predicate.upper() for predicate in policy)
         assert all('SELECT current_setting' in predicate for predicate in policy)
