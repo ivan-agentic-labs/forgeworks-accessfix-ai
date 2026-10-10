@@ -42,6 +42,9 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
     info.update(user='fw_runtime_test',password='synthetic-local-runtime-test-only');runtime=make_conninfo(**info)
     with pytest.raises(ValueError,match='superuser'):PostgresStore(owner)
     store=PostgresStore(runtime)
+    assert store.member_role(TENANT, USER) == 'editor'
+    assert store.member_role(other, USER) is None
+    assert store.member_role(TENANT, 'not-a-uuid') is None
     assert not store.member(TENANT, "unmapped-oidc-subject")
     # Runtime login and its group cannot own tenant/provisioning tables either.
     for table, new_owner in [('memberships','fw_runtime_test'),('tenants',ROLE)]:
