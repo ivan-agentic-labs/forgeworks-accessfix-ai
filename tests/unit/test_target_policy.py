@@ -77,3 +77,19 @@ def test_redirect_chain_rejects_parser_normalized_hop():
 def test_malformed_https_origin_port_fails_during_validation():
     with pytest.raises(ValueError, match="invalid HTTPS origin port"):
         validate_origin("https://example.test:notaport")
+
+
+@pytest.mark.parametrize("runtime", ["production", "staging", "preview"])
+def test_fixture_http_origin_rejected_outside_local_test_runtime(monkeypatch, runtime):
+    monkeypatch.setenv("APP_ENV", runtime)
+    with pytest.raises(ValueError, match="only canonical HTTPS origins"):
+        validate_origin("http://fixture.local")
+    with pytest.raises(ValueError, match="only canonical HTTPS origins"):
+        validate_scan_path("/index", "http://fixture.local")
+
+
+@pytest.mark.parametrize("runtime", ["development", "test"])
+def test_fixture_origin_remains_available_for_isolated_synthetic_tests(monkeypatch, runtime):
+    monkeypatch.setenv("APP_ENV", runtime)
+    assert validate_origin("http://fixture.local") == "http://fixture.local"
+    assert validate_scan_path("/index", "http://fixture.local") == "http://fixture.local/index"
