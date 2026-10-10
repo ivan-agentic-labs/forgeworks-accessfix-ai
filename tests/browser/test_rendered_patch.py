@@ -33,3 +33,24 @@ def test_rendered_fixture_patch_preserves_owner_label_and_blocks_requests():
         assert "https://synthetic.invalid/network-canary" in blocked
         context.close()
         browser.close()
+
+
+@pytest.mark.parametrize('source', ['<img id="hero" src=image.png/>', '<img id="hero" src=image.png />', '<img id="hero" src="image.png"/>', '<IMG id="hero" SRC=image.png/ class=photo>', '<img id="hero" hidden/>', '<img id="hero" data-value=a//>'])
+def test_rendered_patch_preserves_existing_dom_attributes(source):
+    if os.getenv('ACCESSFIX_DISPOSABLE_BROWSER') != 'yes':
+        pytest.skip('Disposable Chromium proof not enabled; NOT a browser pass')
+    from playwright.sync_api import sync_playwright
+    patch = build_image_alt_patch(source.encode(),'hero','Owner supplied label')
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        context = browser.new_context(java_script_enabled=False,service_workers='block',accept_downloads=False)
+        context.route('**/*',lambda route: route.abort('blockedbyclient'))
+        page = context.new_page()
+        page.set_content(source,wait_until='load')
+        attributes = '(node) => Object.fromEntries(Array.from(node.attributes, a => [a.name,a.value]))'
+        before = page.locator('img#hero').evaluate(attributes)
+        page.set_content(patch['patched_source'].decode(),wait_until='load')
+        after = page.locator('img#hero').evaluate(attributes)
+        assert after == {**before,'alt':'Owner supplied label'}
+        context.close()
+        browser.close()

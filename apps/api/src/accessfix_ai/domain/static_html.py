@@ -81,27 +81,39 @@ def build_image_alt_patch(source: bytes, identifier: str, alt_text: str) -> dict
     matches = []
 
     class TargetParser(HTMLParser):
-        def handle_starttag(self, tag, attrs):
+        def target(self, tag, attrs, self_closing):
             values = dict(attrs)
             if values.get("id") == identifier:
                 if len(attrs) != len(values):
                     raise ValueError("Ambiguous duplicate target attributes")
                 line, column = self.getpos()
-                matches.append((tag, values, starts[line - 1] + column, self.get_starttag_text()))
+                matches.append((tag, values, starts[line - 1] + column, self.get_starttag_text(), self_closing))
 
-        handle_startendtag = handle_starttag
+        def handle_starttag(self, tag, attrs):
+            self.target(tag, attrs, False)
+
+        def handle_startendtag(self, tag, attrs):
+            self.target(tag, attrs, True)
 
     parser = TargetParser(convert_charrefs=True)
     parser.feed(text)
     parser.close()
     if len(matches) != 1 or matches[0][0] != "img":
         raise ValueError("Target must be exactly one uniquely identified image")
-    _, attrs, start, raw = matches[0]
+    _, attrs, start, raw, self_closing = matches[0]
     if "alt" in attrs:
         raise ValueError("Existing alternative text requires a separate reviewed change")
-    insertion = len(raw) - (2 if raw.endswith("/>") else 1)
+    # A slash adjacent to an unquoted attribute value is data, not a closing
+    # marker. HTMLParser distinguishes this from an actual self-closing tag.
+    insertion = len(raw) - (2 if self_closing else 1)
     replacement = raw[:insertion] + ' alt="' + escape(alt_text, quote=True) + '"' + raw[insertion:]
     patched = (text[:start] + replacement + text[start + len(raw):]).encode("utf-8")
+    matches.clear()
+    parser = TargetParser(convert_charrefs=True)
+    parser.feed(patched.decode("utf-8"))
+    parser.close()
+    if len(matches) != 1 or matches[0][1] != {**attrs, "alt": alt_text}:
+        raise ValueError("Patch changed existing image attributes")
     after = image_alt_findings(patched)
     before = image_alt_findings(source)
     if len(after) != len(before) - 1 or any(row["selector"] == "img#" + identifier for row in after):

@@ -34,3 +34,19 @@ def test_ambiguous_or_existing_targets_fail_closed(source):
 def test_no_invented_empty_or_unbounded_label(label):
     with pytest.raises(ValueError):
         build_image_alt_patch(b'<img id="hero">', "hero", label)
+
+
+@pytest.mark.parametrize('source', [b'<img id="hero" src=image.png/>', b'<img id="hero" src=image.png />', b'<img id="hero" src="image.png"/>', b'<IMG id="hero" SRC=image.png/ class=photo>', b'<img id="hero" hidden/>', b'<img id="hero" data-value=a//>'])
+def test_patch_preserves_every_existing_image_attribute(source):
+    from html.parser import HTMLParser
+    def attributes(body):
+        values = []
+        class Parser(HTMLParser):
+            def handle_starttag(self,tag,attrs):
+                if tag == 'img': values.append(dict(attrs))
+            handle_startendtag = handle_starttag
+        Parser().feed(body.decode())
+        return values[0]
+    before = attributes(source)
+    result = build_image_alt_patch(source, 'hero', 'Owner supplied label')
+    assert attributes(result['patched_source']) == {**before, 'alt':'Owner supplied label'}
