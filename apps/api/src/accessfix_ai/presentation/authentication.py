@@ -1,6 +1,7 @@
 """Bearer verification. Development credentials require explicit test/development mode."""
 from __future__ import annotations
 
+import math
 import os
 from functools import lru_cache
 from urllib.parse import urlsplit
@@ -18,6 +19,19 @@ def problem(status: int, code: str, detail: str):
     raise HTTPException(status_code=status, detail={"type": "about:blank", "title": "Request rejected", "status": status, "code": code, "detail": detail, "request_id": "runtime"})
 
 
+def identity_url(url: str):
+    """Reject malformed configuration rather than silently normalizing it."""
+    try:
+        if any(character.isspace() or ord(character) < 32 or ord(character) == 127 for character in url):
+            raise ValueError("Whitespace or control character in identity URL")
+        parsed = urlsplit(url)
+        # Accessing port validates its syntax and range even for OIDC endpoints.
+        parsed.port
+    except ValueError:
+        problem(503, "AUTH_NOT_CONFIGURED", "Identity URLs must be valid HTTPS endpoints")
+    return parsed
+
+
 def configuration():
     mode = os.getenv("AUTH_MODE", "oidc")
     environment = os.getenv("APP_ENV", "development")
@@ -30,7 +44,7 @@ def configuration():
         return mode, issuer, audience, secret
     if mode == "supabase":
         base = os.getenv("SUPABASE_URL", "").rstrip("/")
-        parsed = urlsplit(base)
+        parsed = identity_url(base)
         if (parsed.scheme != "https" or not parsed.hostname
                 or not parsed.hostname.endswith(".supabase.co")
                 or parsed.username or parsed.password or parsed.port
@@ -41,7 +55,7 @@ def configuration():
         problem(503, "AUTH_NOT_CONFIGURED", "Unsupported authentication mode")
     jwks_url = os.getenv("AUTH_JWKS_URL", "")
     for url in (issuer, jwks_url):
-        parsed = urlsplit(url)
+        parsed = identity_url(url)
         if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.fragment:
             problem(503, "AUTH_NOT_CONFIGURED", "OIDC issuer and JWKS URL must be configured HTTPS endpoints")
     if not audience:
@@ -68,6 +82,12 @@ def decode_bearer(authorization: str | None) -> dict:
         key = material if mode == "development" else jwks_client(material).get_signing_key_from_jwt(token).key
         required = ["exp", "iat", "iss", "aud", "sub", "role", "session_id", "is_anonymous"] if mode == "supabase" else REQUIRED
         claims = jwt.decode(token, key, algorithms=allowed, issuer=issuer, audience=audience, options={"require": required})
+        for field in ("exp", "iat", "nbf"):
+            if field in claims:
+                value = claims[field]
+                if (type(value) not in (int, float)
+                        or isinstance(value, float) and not math.isfinite(value)):
+                    raise jwt.InvalidTokenError("NumericDate must be a finite JSON number")
         if mode == "supabase":
             # Ignore user_metadata and top-level application claims entirely.
             if claims["role"] != "authenticated" or claims["is_anonymous"] is not False:
@@ -94,7 +114,7 @@ def decode_bearer(authorization: str | None) -> dict:
         return claims
     except jwt.PyJWKClientConnectionError:
         problem(503, "IDENTITY_PROVIDER_UNAVAILABLE", "Identity key service is unavailable")
-    except (jwt.PyJWTError, ValueError, TypeError, AttributeError):
+    except (jwt.PyJWTError, ValueError, TypeError, AttributeError, OverflowError):
         problem(401, "INVALID_TOKEN", "Token signature or required claims are invalid")
 
 

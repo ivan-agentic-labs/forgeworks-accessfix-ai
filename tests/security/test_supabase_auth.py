@@ -112,3 +112,20 @@ def test_supabase_configuration_origin(monkeypatch,url):
     monkeypatch.setenv("SUPABASE_URL",url)
     with pytest.raises(HTTPException) as error: configuration()
     assert error.value.status_code==503
+
+
+@pytest.mark.parametrize("field", ["exp", "iat", "nbf"])
+@pytest.mark.parametrize("value", [float("inf"), float("-inf"), float("nan"), True, False, "2000000000", None])
+def test_supabase_invalid_numeric_dates(identity, field, value):
+    key, claims, _ = identity
+    claims[field] = value
+    with pytest.raises(HTTPException) as error:
+        decode_bearer(token(key, claims))
+    assert error.value.status_code == 401
+    assert error.value.detail["code"] == "INVALID_TOKEN"
+
+
+def test_supabase_fractional_numeric_dates(identity):
+    key, claims, _ = identity
+    claims.update(exp=time.time() + 60, iat=time.time() - 10, nbf=time.time() - 5)
+    assert decode_bearer(token(key, claims))["tenant_id"] == TENANT
