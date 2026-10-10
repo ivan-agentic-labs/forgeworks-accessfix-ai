@@ -51,3 +51,19 @@ After independent review, apply `004_sites_rls_initplan.sql` through the migrati
 
 Rollback requires separately reviewed restoration of the original policy predicate:
 `ALTER POLICY sites_tenant ON fw_accessfix_ai.sites USING (tenant_id = nullif(current_setting('app.tenant_id', true),'')::uuid) WITH CHECK (tenant_id = nullif(current_setting('app.tenant_id',true),'')::uuid);`.
+
+## Remaining FK index rollout (2026-10-11)
+
+`007_remaining_fk_indexes.sql` adds tenant-prefixed indexes for referencing
+foreign keys not covered by existing primary/unique/lookup indexes. The tables
+in connected staging are small (each below 128 KiB at review). Apply using the
+migration role, the product's private `search_path`, and a single transaction.
+Lock and statement timeouts bound this small-table rollout. For a populated
+production deployment, separately assess write overhead and use a reviewed
+concurrent-index procedure; this staging script is not a production benchmark.
+
+The disposable runtime proof executes the migration twice and verifies exact
+index definitions, followed by the existing business-flow and RLS negatives.
+Do not drop unused indexes merely to remove advisor INFO notices. Rollback is
+limited to the newly named indexes after query-plan review; it requires no
+row, membership, constraint, grant or tenant-policy changes.
