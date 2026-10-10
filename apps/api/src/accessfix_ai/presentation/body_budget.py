@@ -31,7 +31,7 @@ class BodyBudgetMiddleware:
         lengths = [value for name, value in scope.get("headers", [])
                    if name.lower() == b"content-length"]
         if lengths:
-            if len(lengths) != 1 or not lengths[0].isdigit():
+            if len(lengths) != 1 or len(lengths[0]) > 20 or not lengths[0].isdigit():
                 return await reject(400, "INVALID_CONTENT_LENGTH", "Content-Length must be one decimal integer")
             if int(lengths[0]) > self.max_bytes:
                 return await reject(413, "REQUEST_BODY_TOO_LARGE", "Request exceeds the 8 MiB body budget")
