@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '23 1,7,13,19 * * *'
 permissions:
   contents: read
 jobs:
@@ -28,6 +30,14 @@ jobs:
             exit 1
           fi
           echo "Anonymous protected-job read correctly denied (401)"
+          for invalid_auth in "Bearer not-a-jwt" "Bearer eyJhbGciOiJub25lIn0.e30." "bearer invalid"; do
+            status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 --connect-timeout 10 --header "Authorization: $invalid_auth" "$BASE_URL/v1/jobs/00000000-0000-0000-0000-000000000001")"
+            if [[ "$status" != "401" ]]; then
+              echo "Malformed or unsigned bearer token was not rejected (status: $status)"
+              exit 1
+            fi
+          done
+          echo "Malformed, unsigned and mis-cased bearer tokens denied (401)"
           curl --fail --silent --show-error --max-time 20 --connect-timeout 10 --max-filesize 4096 "$BASE_URL/v1/auth/config" |
             python -c 'import json,sys; x=json.load(sys.stdin); assert x.get("enabled") is True; assert x.get("product")=="accessfix-ai"; assert x.get("environment")=="staging"; assert x.get("publishable_key","").startswith("sb_publishable_"); assert x.get("supabase_url","").startswith("https://"); assert x.get("supabase_url","").endswith(".supabase.co"), "Auth client config invalid"'
           echo "Public staging Auth client configuration validated; no token or credential was logged."
