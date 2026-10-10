@@ -28,4 +28,7 @@ jobs:
             exit 1
           fi
           echo "Anonymous protected-job read correctly denied (401)"
+          curl --fail --silent --show-error --max-time 20 --connect-timeout 10 --max-filesize 4096 "$BASE_URL/v1/auth/config" |
+            python -c 'import json,sys; x=json.load(sys.stdin); assert x.get("enabled") is True; assert x.get("product")=="accessfix-ai"; assert x.get("environment")=="staging"; assert x.get("publishable_key","").startswith("sb_publishable_"); assert x.get("supabase_url","").startswith("https://"); assert x.get("supabase_url","").endswith(".supabase.co"), "Auth client config invalid"'
+          echo "Public staging Auth client configuration validated; no token or credential was logged."
           echo "Public staging liveness/readiness response verified; this does not prove authenticated product acceptance."
