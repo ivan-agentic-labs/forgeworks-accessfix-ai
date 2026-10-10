@@ -20,6 +20,9 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
     with psycopg.connect(owner) as db:
         if db.execute("SELECT to_regclass('sites')").fetchone()[0]:pytest.fail('Proof requires a fresh empty database')
         for name in ['001_accessfix_mvp.sql','002_accessfix_runtime.sql','003_accessfix_source_snapshots.sql','004_accessfix_proposal_sources.sql']:db.execute((root/'migrations/versions'/name).read_text())
+        db.execute((root/'infra/environments/staging/003_fk_lookup_index.sql').read_text())
+        definition = db.execute("SELECT pg_get_indexdef('idx_scan_jobs_tenant_site'::regclass)").fetchone()[0]
+        assert 'scan_jobs USING btree (tenant_id, site_id)' in definition
         db.execute("CREATE ROLE fw_runtime_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'synthetic-local-runtime-test-only'")
         db.execute('GRANT fw_accessfix_ai_rw TO fw_runtime_test')
         db.execute('INSERT INTO tenants VALUES(%s,%s,%s)',(TENANT,'synthetic-demo','ACTIVE'))
