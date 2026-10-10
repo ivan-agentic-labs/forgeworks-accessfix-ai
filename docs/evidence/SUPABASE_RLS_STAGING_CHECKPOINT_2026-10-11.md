@@ -23,7 +23,7 @@
 - RLS policies retain the original tenant equality in `USING` and `WITH CHECK`; direct `(SELECT current_setting(...))` initPlans remove the advisor warnings.
 - No new anonymous or authenticated role grants were created by these policy migrations.
 - Disposable PostgreSQL negative tenant tests passed in CI. A **live** role-switched RLS transaction using the available Supabase connector returned permission denied to `SET ROLE`; **do not mark that test passed**.
-- External direct `/readyz` test failed due DNS resolution from this execution environment; Railway health/startup evidence is not equivalent to a browser E2E pass.
+- Direct `/readyz` from this assistant's container failed due DNS resolution, but a separate GitHub-hosted runner has now independently verified public `/healthz` and `/readyz`, rejected a credential-free `/v1/jobs/` request with HTTP 401, and validated the frontend's safe Supabase Auth configuration. **Authenticated owner workflows are still untested.**
 
 ## Open release blockers
 
@@ -36,3 +36,9 @@
 ## Acceptance
 
 This checkpoint is evidence of **staging deployment + synthetic CI + current catalog lint state**, not authorization to use real customer data or launch production. Release process: `ops/runbooks/STAGING_RELEASE_AND_ROLLBACK.md`.
+
+## Independent public HTTPS smoke evidence
+
+- [GitHub Actions staging liveness, readiness, anonymous 401, and Auth-client-config proof](https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/38090079046): `success`.
+- This probe does **not** log publishable keys, does not hold tokens, uses no customer data, and does not prove a successful authenticated login, session revocation or cross-tenant negative cases against staging.
+- Railway remains commit-pinned; the GitHub workflow probes the currently running staging revision, not necessarily the latest documentation-only `main` revision.
