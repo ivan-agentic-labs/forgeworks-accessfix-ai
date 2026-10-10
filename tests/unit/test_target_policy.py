@@ -2,6 +2,7 @@ import pytest
 
 from accessfix_ai.domain.target_policy import (
     MAX_REDIRECTS,
+    validate_origin,
     validate_redirect_chain,
     validate_scan_path,
     validate_scan_request,
@@ -43,3 +44,36 @@ def test_path_rejects_private_literal_and_limits_are_bounded():
         validate_scan_request(["/"] * 21)
     with pytest.raises(ValueError, match="maximum length"):
         validate_scan_request(["/" + "a" * 2048])
+
+
+@pytest.mark.parametrize("origin", [
+    " https://example.test",
+    "https://example.test\r\n",
+    "https://example.test\\\\@attacker.test",
+    "https://example.test\t",
+])
+def test_origin_rejects_parser_normalized_or_ambiguous_characters(origin):
+    with pytest.raises(ValueError, match="unsafe URL characters"):
+        validate_origin(origin)
+
+
+@pytest.mark.parametrize("path", ["/ok\t", "/ok\r\n", "/ok\\\\suffix", "/has space"])
+def test_scan_paths_reject_unsafe_url_bytes_even_without_origin(path):
+    with pytest.raises(ValueError, match="unsafe URL characters"):
+        validate_scan_request([path])
+    with pytest.raises(ValueError, match="unsafe URL characters"):
+        validate_scan_path(path, "https://example.test", lambda host: ["93.184.216.34"])
+
+
+def test_redirect_chain_rejects_parser_normalized_hop():
+    with pytest.raises(ValueError, match="unsafe URL characters"):
+        validate_redirect_chain(
+            ["https://example.test/", "https://example.test/\tadmin"],
+            "https://example.test",
+            lambda host: ["93.184.216.34"],
+        )
+
+
+def test_malformed_https_origin_port_fails_during_validation():
+    with pytest.raises(ValueError, match="invalid HTTPS origin port"):
+        validate_origin("https://example.test:notaport")

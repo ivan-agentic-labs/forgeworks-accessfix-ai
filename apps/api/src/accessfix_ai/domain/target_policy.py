@@ -16,6 +16,12 @@ MAX_SCAN_PATH_LENGTH = 2048
 Resolver = Callable[[str], Iterable[str]]
 
 
+def _reject_unsafe_url_bytes(value: str) -> None:
+    """Never let URL parser whitespace stripping change the checked target."""
+    if not isinstance(value, str) or any(ord(ch) <= 0x20 or ord(ch) == 0x7f or ch == "\\" for ch in value):
+        raise ValueError("unsafe URL characters")
+
+
 def _resolve(host: str) -> list[str]:
     """Resolve a host to numeric addresses without following application URLs."""
     try:
@@ -51,7 +57,12 @@ def _checked_answers(host: str, resolver: Resolver) -> tuple[str, ...]:
 
 
 def validate_origin(origin: str, allow_fixture: bool = True) -> str:
+    _reject_unsafe_url_bytes(origin)
     p = urlparse(origin)
+    try:
+        p.port  # Force malformed port numbers to fail at the validation boundary.
+    except ValueError as exc:
+        raise ValueError("invalid HTTPS origin port") from exc
     if allow_fixture and p.hostname == "fixture.local" and p.scheme == "http":
         if p.username or p.password or p.path not in ("", "/") or p.query or p.fragment or p.port:
             raise ValueError("only canonical fixture origins are allowed")
@@ -73,6 +84,7 @@ def validate_origin(origin: str, allow_fixture: bool = True) -> str:
 
 
 def _same_origin(candidate: str, origin: str) -> bool:
+    _reject_unsafe_url_bytes(candidate)
     target = urlparse(candidate)
     verified = urlparse(origin)
     return (
@@ -88,6 +100,7 @@ def _same_origin(candidate: str, origin: str) -> bool:
 def validate_scan_path(path: str, origin: str, resolver: Resolver | None = None) -> str:
     if not isinstance(path, str) or not path or len(path) > MAX_SCAN_PATH_LENGTH:
         raise ValueError(f"scan path maximum length is {MAX_SCAN_PATH_LENGTH}")
+    _reject_unsafe_url_bytes(path)
     origin = validate_origin(origin)
     candidate = path if path.startswith(("http://", "https://")) else origin + "/" + path.lstrip("/")
     parsed = urlparse(candidate)
@@ -110,6 +123,8 @@ def validate_scan_request(paths: list[str], origin: str | None = None) -> list[s
         raise ValueError(f"scan paths must be between {MIN_SCAN_PATHS} and {MAX_SCAN_PATHS} items")
     if any(not isinstance(path, str) or len(path) > MAX_SCAN_PATH_LENGTH for path in paths):
         raise ValueError(f"scan path maximum length is {MAX_SCAN_PATH_LENGTH}")
+    for path in paths:
+        _reject_unsafe_url_bytes(path)
     if origin is None:
         return paths
     return [validate_scan_path(path, origin) for path in paths]
