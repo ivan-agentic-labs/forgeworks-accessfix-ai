@@ -9,10 +9,24 @@ def claims(authorization: Annotated[str | None, Header()] = None):
     return decode_bearer(authorization)
 
 
+def role_scope_allowed(role: str, required_scope: str) -> bool:
+    """JWT scope AND current membership role are both required.
+
+    Viewer may only read. Unknown roles fail closed until explicitly reviewed.
+    Editor/owner/admin retain granular server-provisioned JWT scope checks.
+    """
+    if role == "viewer":
+        return required_scope.endswith(":read")
+    return role in {"editor", "owner", "admin"}
+
+
 def scope(required,store:Store):
  def dep(c=Depends(claims)):
   verify_session(store, c)
-  if not c.get('tenant_id') or not c.get('sub') or not store.member(c['tenant_id'],c['sub']): reject(403,'TENANT_CONTEXT_INVALID','Verified membership is required')
+  if not c.get('tenant_id') or not c.get('sub'): reject(403,'TENANT_CONTEXT_INVALID','Verified membership is required')
+  role = store.member_role(c['tenant_id'], c['sub'])
+  if role is None: reject(403,'TENANT_CONTEXT_INVALID','Verified membership is required')
+  if not role_scope_allowed(role, required): reject(403,'ROLE_FORBIDDEN','Membership role cannot perform this operation')
   if required not in set(str(c.get('scope','')).split()): reject(403,'INSUFFICIENT_SCOPE',f'Scope {required} is required')
   return c
  return dep
