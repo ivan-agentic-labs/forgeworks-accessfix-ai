@@ -28,13 +28,13 @@ patterns = {
     "private key": r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
     "GitHub token": r"(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{50,})",
     "AWS access key": r"AKIA[A-Z0-9]{16}",
-    "personal email": r"[A-Za-z0-9._%+-]+@(?!example\.(?:com|org)\b)[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+    "personal email": r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@(?!example\.(?:com|org)\b)[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
     "local path": r"/(?:workspace/scratch|root)/",
 }
 scanned = 0
 for p in root.rglob("*"):
     rel = p.relative_to(root)
-    if not p.is_file() or any(x in {".git", "__pycache__", ".venv", "node_modules"} for x in rel.parts):
+    if not p.is_file() or any(x in {".git", "__pycache__", ".venv", "node_modules", ".pytest_cache"} for x in rel.parts):
         continue
     if p.name == ".env" or (p.name.startswith(".env.") and p.name != ".env.example"):
         errors.append(f"environment file: {rel}")
