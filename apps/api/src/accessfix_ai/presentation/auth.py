@@ -15,9 +15,12 @@ def role_scope_allowed(role: str, required_scope: str) -> bool:
     Viewer may only read. Unknown roles fail closed until explicitly reviewed.
     Editor/owner/admin retain granular server-provisioned JWT scope checks.
     """
-    if role == "viewer":
+    if not isinstance(role, str) or role != role.strip():
+        return False
+    normalized = role.casefold()
+    if normalized == "viewer":
         return required_scope.endswith(":read")
-    return role in {"editor", "owner", "admin"}
+    return normalized in {"editor", "owner", "admin"}
 
 
 def scope(required,store:Store):
