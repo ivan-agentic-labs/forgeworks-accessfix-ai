@@ -1,0 +1,28 @@
+# Automated security and compatibility updates are proposed as PRs only.
+# All dependency changes must pass the repository's normal CI and human review.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Jakarta"
+    open-pull-requests-limit: 4
+  - package-ecosystem: "pip"
+    directory: "/apps/api"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Jakarta"
+    open-pull-requests-limit: 4
+  - package-ecosystem: "npm"
+    directory: "/packages/sdk"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Jakarta"
+    open-pull-requests-limit: 4
