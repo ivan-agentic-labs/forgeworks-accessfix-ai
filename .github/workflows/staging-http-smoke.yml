@@ -22,4 +22,10 @@ jobs:
             curl --fail --silent --show-error --max-time 20 --connect-timeout 10 --retry 2 --max-filesize 4096 "$BASE_URL/$endpoint" |
               python -c 'import json,sys; expected=sys.argv[1]; obj=json.load(sys.stdin); assert isinstance(obj,dict) and obj.get("status")==expected, "Unexpected staging readiness state"' "$expected"
           done
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 --connect-timeout 10 "$BASE_URL/v1/jobs/00000000-0000-0000-0000-000000000001")"
+          if [[ "$status" != "401" ]]; then
+            echo "Expected HTTP 401 for anonymous protected job read; received $status"
+            exit 1
+          fi
+          echo "Anonymous protected-job read correctly denied (401)"
           echo "Public staging liveness/readiness response verified; this does not prove authenticated product acceptance."
