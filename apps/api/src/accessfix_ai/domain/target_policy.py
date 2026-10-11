@@ -67,6 +67,10 @@ def validate_origin(origin: str, allow_fixture: bool = True) -> str:
         return origin.rstrip("/")
     if p.scheme != "https" or not p.hostname or p.username or p.password or p.path not in ("", "/") or p.query or p.fragment:
         raise ValueError("only canonical HTTPS origins are allowed")
+    # The fixture is local-only. An HTTPS spelling must never bypass DNS
+    # validation or become a remotely scannable target.
+    if p.hostname.lower() == "fixture.local":
+        raise ValueError("fixture.local cannot be a public scan origin")
     try:
         # ip_address raises for DNS names; those are checked at connection time
         # by validate_redirect_chain/validate_scan_path with the resolver.
