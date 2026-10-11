@@ -99,9 +99,19 @@ def _same_origin(candidate: str, origin: str) -> bool:
     )
 
 
-def validate_scan_path(path: str, origin: str, resolver: Resolver | None = None) -> str:
-    if not isinstance(path, str) or not path or len(path) > MAX_SCAN_PATH_LENGTH:
+def _require_bounded_path(path: str) -> None:
+    if not isinstance(path, str) or not path:
         raise ValueError(f"scan path maximum length is {MAX_SCAN_PATH_LENGTH}")
+    try:
+        encoded_bytes = len(path.encode("utf-8", errors="strict"))
+    except UnicodeError as exc:
+        raise ValueError("scan path must be valid UTF-8") from exc
+    if encoded_bytes > MAX_SCAN_PATH_LENGTH:
+        raise ValueError(f"scan path maximum length is {MAX_SCAN_PATH_LENGTH} UTF-8 bytes")
+
+
+def validate_scan_path(path: str, origin: str, resolver: Resolver | None = None) -> str:
+    _require_bounded_path(path)
     _reject_unsafe_url_bytes(path)
     origin = validate_origin(origin)
     candidate = path if path.startswith(("http://", "https://")) else origin + "/" + path.lstrip("/")
@@ -123,9 +133,8 @@ def validate_scan_path(path: str, origin: str, resolver: Resolver | None = None)
 def validate_scan_request(paths: list[str], origin: str | None = None) -> list[str]:
     if not isinstance(paths, list) or not (MIN_SCAN_PATHS <= len(paths) <= MAX_SCAN_PATHS):
         raise ValueError(f"scan paths must be between {MIN_SCAN_PATHS} and {MAX_SCAN_PATHS} items")
-    if any(not isinstance(path, str) or len(path) > MAX_SCAN_PATH_LENGTH for path in paths):
-        raise ValueError(f"scan path maximum length is {MAX_SCAN_PATH_LENGTH}")
     for path in paths:
+        _require_bounded_path(path)
         _reject_unsafe_url_bytes(path)
     if origin is None:
         return paths

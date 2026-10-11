@@ -139,3 +139,24 @@ def test_https_fixture_cannot_bypass_dns_validation(monkeypatch, runtime):
         validate_origin("https://fixture.local")
     with pytest.raises(ValueError, match="fixture.local cannot be a public scan origin"):
         validate_scan_path("/admin", "https://fixture.local", lambda _: ["8.8.8.8"])
+
+
+def test_unicode_path_budget_is_enforced_on_actual_utf8_bytes():
+    within = "/" + "é" * 1023  # 2047 UTF-8 bytes
+    over = "/" + "é" * 1024    # 2049 UTF-8 bytes; only 1025 chars
+    assert validate_scan_request([within]) == [within]
+    assert validate_scan_path(
+        within, "https://owned.example.test", lambda _: ["93.184.216.34"]
+    ) == "https://owned.example.test" + within
+    with pytest.raises(ValueError, match="UTF-8 bytes"):
+        validate_scan_request([over])
+    with pytest.raises(ValueError, match="UTF-8 bytes"):
+        validate_scan_path(over, "https://owned.example.test", lambda _: ["93.184.216.34"])
+
+
+def test_unpaired_unicode_surrogates_are_rejected_before_dns_resolution():
+    path = "/bad\ud800"
+    with pytest.raises(ValueError, match="valid UTF-8"):
+        validate_scan_request([path])
+    with pytest.raises(ValueError, match="valid UTF-8"):
+        validate_scan_path(path, "https://owned.example.test", lambda _: (_ for _ in ()).throw(AssertionError("DNS must not run")))
