@@ -18,7 +18,7 @@ Resolver = Callable[[str], Iterable[str]]
 
 
 def _reject_unsafe_url_bytes(value: str) -> None:
-    """Never let URL parser whitespace stripping change the checked target."""
+    """Never let URL parser normalization change the checked target."""
     if not isinstance(value, str) or any(ord(ch) <= 0x20 or ord(ch) == 0x7f or ch == "\\" for ch in value):
         raise ValueError("unsafe URL characters")
 
@@ -113,6 +113,10 @@ def _require_bounded_path(path: str) -> None:
 def validate_scan_path(path: str, origin: str, resolver: Resolver | None = None) -> str:
     _require_bounded_path(path)
     _reject_unsafe_url_bytes(path)
+    # A network-path reference must never be rewritten into a local-looking
+    # path by stripping its leading slashes.
+    if path.startswith("//"):
+        raise ValueError("protocol-relative scan paths are not allowed")
     origin = validate_origin(origin)
     candidate = path if path.startswith(("http://", "https://")) else origin + "/" + path.lstrip("/")
     parsed = urlparse(candidate)
@@ -136,6 +140,8 @@ def validate_scan_request(paths: list[str], origin: str | None = None) -> list[s
     for path in paths:
         _require_bounded_path(path)
         _reject_unsafe_url_bytes(path)
+        if path.startswith("//"):
+            raise ValueError("protocol-relative scan paths are not allowed")
     if origin is None:
         return paths
     return [validate_scan_path(path, origin) for path in paths]

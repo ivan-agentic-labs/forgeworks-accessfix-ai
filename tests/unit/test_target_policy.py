@@ -160,3 +160,11 @@ def test_unpaired_unicode_surrogates_are_rejected_before_dns_resolution():
         validate_scan_request([path])
     with pytest.raises(ValueError, match="valid UTF-8"):
         validate_scan_path(path, "https://owned.example.test", lambda _: (_ for _ in ()).throw(AssertionError("DNS must not run")))
+
+
+@pytest.mark.parametrize("path", ["//attacker.invalid/asset", "///admin", "////"])
+def test_protocol_relative_paths_are_not_normalized_to_verified_origin(path):
+    with pytest.raises(ValueError, match="protocol-relative"):
+        validate_scan_request([path])
+    with pytest.raises(ValueError, match="protocol-relative"):
+        validate_scan_path(path, "https://owned.example.test", lambda _: (_ for _ in ()).throw(AssertionError("DNS must not run")))
