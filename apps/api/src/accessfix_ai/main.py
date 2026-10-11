@@ -11,6 +11,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
@@ -60,7 +61,7 @@ class CreateFix(BaseModel):
 class Retest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     repo_commit_sha: str = Field(pattern=r"^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$")
-    expected_version: int = Field(ge=1)
+    expected_version: int = Field(ge=1, strict=True)
 
 
 class Review(BaseModel):
@@ -68,7 +69,7 @@ class Review(BaseModel):
     patch_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     decision: str
     manual_check_status: str
-    expected_version: int = Field(ge=1)
+    expected_version: int = Field(ge=1, strict=True)
 
 
 class Publish(BaseModel):
@@ -139,6 +140,15 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         expose_headers=["X-Development-Challenge-Token"],
     )
     app.state.store = store
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(_, error: RequestValidationError):
+        # Do not echo raw input or attempt to serialize non-finite values.
+        return JSONResponse(status_code=422, content={
+            "type": "about:blank", "title": "Request rejected", "status": 422,
+            "code": "INVALID_REQUEST", "detail": "Request does not match the input contract",
+            "request_id": "runtime",
+        })
 
     @app.exception_handler(HTTPException)
     async def http_error(_, exc: HTTPException):
