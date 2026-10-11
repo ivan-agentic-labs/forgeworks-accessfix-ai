@@ -130,3 +130,12 @@ def test_non_global_redirect_dns_answer_is_rejected_even_on_same_origin():
             "https://owned.example.test",
             lambda _: next(answers),
         )
+
+
+@pytest.mark.parametrize("runtime", ["development", "test", "staging", "production"])
+def test_https_fixture_cannot_bypass_dns_validation(monkeypatch, runtime):
+    monkeypatch.setenv("APP_ENV", runtime)
+    with pytest.raises(ValueError, match="fixture.local cannot be a public scan origin"):
+        validate_origin("https://fixture.local")
+    with pytest.raises(ValueError, match="fixture.local cannot be a public scan origin"):
+        validate_scan_path("/admin", "https://fixture.local", lambda _: ["8.8.8.8"])
