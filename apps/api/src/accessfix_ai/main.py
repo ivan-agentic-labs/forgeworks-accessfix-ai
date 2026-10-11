@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import os
 import secrets
 import threading
@@ -216,15 +217,22 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             or row["site_id"] != str(site_id)
             or row["used_at"]
             or row["expires_at"] < _timestamp()
-            or hashlib.sha256(body.evidence_token.encode()).hexdigest() != row["token_hash"]
+            or not hmac.compare_digest(hashlib.sha256(body.evidence_token.encode()).hexdigest(), row["token_hash"])
         ):
             return problem(400, "VERIFICATION_FAILED", "Challenge is invalid, expired, or already used")
+        target = store.site(c["tenant_id"], str(site_id))
+        if not target:
+            return problem(400, "VERIFICATION_FAILED", "Site is no longer available")
         if os.getenv("OWNERSHIP_VERIFY_MODE") == "http-file":
             from accessfix_ai.infrastructure.ownership_verifier import verify_ownership
-            target = store.site(c["tenant_id"], str(site_id))
-            if not target or not verify_ownership(target["origin"], body.evidence_token):
+            if not verify_ownership(target["origin"], body.evidence_token):
                 return problem(400, "OWNERSHIP_PROOF_UNAVAILABLE", "Publish the challenge token at the HTTPS verification path before verifying")
-        site = store.verify(c["tenant_id"], str(body.challenge_id))
+        try:
+            site = store.verify(c["tenant_id"], str(body.challenge_id), expected_origin=target["origin"])
+        except ValueError:
+            site = None
+        if site is None:
+            return problem(409, "VERIFICATION_RACE_REJECTED", "Challenge expired, was used, or site origin changed")
         proof = hashlib.sha256((site["origin"] + body.evidence_token).encode()).hexdigest()
         return {
             "id": str(body.challenge_id),
