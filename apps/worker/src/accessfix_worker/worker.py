@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
-from accessfix_ai.infrastructure.store import Store
+from accessfix_ai.infrastructure.store import Store, validate_attempt_budget
 
 
 @dataclass(frozen=True)
@@ -12,6 +12,9 @@ class WorkerConfig:
     lease_seconds: float = 0.25
     timeout_seconds: float = 1.0
     max_attempts: int = 3
+
+    def __post_init__(self):
+        validate_attempt_budget(self.max_attempts)
 
 
 class ScanWorker:
@@ -28,7 +31,7 @@ class ScanWorker:
         self.processor = processor
 
     def run_once(self) -> bool:
-        row = self.store.claim_scan(self.config.lease_seconds, self.config.timeout_seconds)
+        row = self.store.claim_scan(self.config.lease_seconds, self.config.timeout_seconds, max_attempts=self.config.max_attempts)
         if not row:
             return False
         tenant, scan_id = row["tenant_id"], row["id"]
