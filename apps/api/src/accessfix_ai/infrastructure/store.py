@@ -31,6 +31,11 @@ def later(seconds: float) -> str:
     return (datetime.now(timezone.utc) + timedelta(seconds=seconds)).isoformat().replace("+00:00", "Z")
 
 
+def validate_attempt_budget(max_attempts: int) -> None:
+    if type(max_attempts) is not int or max_attempts < 1:
+        raise ValueError("max_attempts must be a positive integer")
+
+
 class Store:
     def __init__(self, path: str):
         self._uri = path == ":memory:"
@@ -164,10 +169,17 @@ class Store:
         with self.conn() as c:
             return c.execute("SELECT * FROM scans WHERE tenant_id=? AND id=?", (tenant, scan_id)).fetchone()
 
-    def claim_scan(self, lease_seconds: float = 5.0, timeout_seconds: float = 30.0):
+    def claim_scan(self, lease_seconds: float = 5.0, timeout_seconds: float = 30.0, *, max_attempts: int = 3):
+        validate_attempt_budget(max_attempts)
         with self.lock, self.conn() as c:
+            c.execute("BEGIN IMMEDIATE")
             current = now()
-            row = c.execute("SELECT * FROM scans WHERE status='PENDING' OR (status='RUNNING' AND lease_until IS NOT NULL AND lease_until<?) ORDER BY created_at LIMIT 1", (current,)).fetchone()
+            c.execute("UPDATE scans SET status=CASE WHEN cancel_requested=1 THEN 'CANCELLED' ELSE 'FAILED' END, "
+                      "last_error_code=CASE WHEN cancel_requested=1 THEN 'CANCELLED' ELSE 'MAX_ATTEMPTS_EXCEEDED' END, "
+                      "lease_until=NULL,timeout_at=NULL WHERE attempt_count>=? AND "
+                      "(status='PENDING' OR (status='RUNNING' AND lease_until IS NOT NULL AND lease_until<?))",
+                      (max_attempts, current))
+            row = c.execute("SELECT * FROM scans WHERE attempt_count<? AND (status='PENDING' OR (status='RUNNING' AND lease_until IS NOT NULL AND lease_until<?)) ORDER BY created_at LIMIT 1", (max_attempts, current)).fetchone()
             if not row:
                 return None
             attempt = int(row["attempt_count"] or 0) + 1

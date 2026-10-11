@@ -103,6 +103,26 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
     newer=store.claim_scan(20,30)
     assert not store.complete_scan(TENANT,scan_id,old['lease_until'])
     assert store.complete_scan(TENANT,scan_id,newer['lease_until'])
+    crashed = store.scan(TENANT, SITE, 'd'*40, 'b'*64)
+    for attempt in range(1, 3):
+        lease = store.claim_scan(20, 30, max_attempts=2)
+        assert lease['id'] == crashed['id'] and lease['attempt_count'] == attempt
+        assert store.claim_scan(20, 30, max_attempts=2) is None
+        assert store.get_scan(TENANT, crashed['id'])['status'] == 'RUNNING'
+        with store.conn(TENANT) as db:
+            db.execute('UPDATE scans SET lease_until=? WHERE tenant_id=? AND id=?',
+                       ('2000-01-01T00:00:00Z', TENANT, crashed['id']))
+    ready = store.scan(TENANT, SITE, 'e'*40, 'b'*64)
+    lease = store.claim_scan(20, 30, max_attempts=2)
+    assert lease['id'] == ready['id']
+    final = store.get_scan(TENANT, crashed['id'])
+    assert final['status'] == 'FAILED' and final['attempt_count'] == 2
+    assert final['last_error_code'] == 'MAX_ATTEMPTS_EXCEEDED'
+    assert final['lease_until'] is None and final['timeout_at'] is None
+    assert store.findings(TENANT, crashed['id']) == []
+    assert store.scan_source(TENANT, crashed['id']) is None
+    assert not store.complete_scan(TENANT, crashed['id'])
+    assert store.complete_scan(TENANT, ready['id'], lease['lease_until'])
     assert store.scan_source(TENANT,scan_id)['source_html'].startswith('<!doctype html>')
     assert store.scan_source(other,scan_id) is None
     with store.conn(TENANT) as db:

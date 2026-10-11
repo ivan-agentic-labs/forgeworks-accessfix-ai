@@ -16,7 +16,7 @@ from uuid import UUID, uuid4
 import psycopg
 from psycopg.rows import dict_row
 
-from accessfix_ai.infrastructure.store import Store, now, later
+from accessfix_ai.infrastructure.store import Store, now, later, validate_attempt_budget
 
 TENANT_CONTEXT = ContextVar("accessfix_tenant", default=None)
 ROLE = "fw_accessfix_ai_rw"
@@ -169,12 +169,18 @@ class PostgresStore(Store):
 
     def seed(self):
         raise ValueError("PostgreSQL provisioning requires a separate migration/provisioning role")
-    def claim_scan(self, lease_seconds=5.0, timeout_seconds=30.0):
+    def claim_scan(self, lease_seconds=5.0, timeout_seconds=30.0, *, max_attempts=3):
+        validate_attempt_budget(max_attempts)
         tenants = [str(UUID(value.strip())) for value in os.getenv("ACCESSFIX_WORKER_TENANTS", "").split(",") if value.strip()]
         for tenant in tenants:
             with self.conn(tenant) as db:
                 current = now()
-                row = db.execute("SELECT * FROM scans WHERE status='PENDING' OR (status='RUNNING' AND lease_until IS NOT NULL AND lease_until<?) ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED", (current,)).fetchone()
+                db.execute("UPDATE scans SET status=CASE WHEN cancel_requested=1 THEN 'CANCELLED' ELSE 'FAILED' END, "
+                           "last_error_code=CASE WHEN cancel_requested=1 THEN 'CANCELLED' ELSE 'MAX_ATTEMPTS_EXCEEDED' END, "
+                           "lease_until=NULL,timeout_at=NULL WHERE tenant_id=? AND attempt_count>=? AND "
+                           "(status='PENDING' OR (status='RUNNING' AND lease_until IS NOT NULL AND lease_until<?))",
+                           (tenant, max_attempts, current))
+                row = db.execute("SELECT * FROM scans WHERE attempt_count<? AND (status='PENDING' OR (status='RUNNING' AND lease_until IS NOT NULL AND lease_until<?)) ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED", (max_attempts, current)).fetchone()
                 if row:
                     db.execute("UPDATE scans SET status='RUNNING',attempt_count=attempt_count+1,lease_until=?,timeout_at=?,last_error_code=NULL WHERE tenant_id=? AND id=?", (later(lease_seconds),later(timeout_seconds),tenant,row["id"]))
                     return db.execute("SELECT * FROM scans WHERE tenant_id=? AND id=?",(tenant,row["id"])).fetchone()
