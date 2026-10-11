@@ -38,14 +38,11 @@ def _is_blocked_address(value: str) -> bool:
         address = ipaddress.ip_address(value)
     except ValueError:
         return True
-    return (
-        address.is_private
-        or address.is_loopback
-        or address.is_link_local
-        or address.is_reserved
-        or address.is_unspecified
-        or address.is_multicast
-    )
+    # "not private" does not mean globally routable: e.g. RFC 6598
+    # shared/CGNAT 100.64.0.0/10 has is_private=False and
+    # is_reserved=False, but must never be eligible for outbound scans.
+    # Deny every non-global range, including future special-purpose ranges.
+    return not address.is_global
 
 
 def _checked_answers(host: str, resolver: Resolver) -> tuple[str, ...]:
