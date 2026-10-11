@@ -93,3 +93,49 @@ def test_fixture_origin_remains_available_for_isolated_synthetic_tests(monkeypat
     monkeypatch.setenv("APP_ENV", runtime)
     assert validate_origin("http://fixture.local") == "http://fixture.local"
     assert validate_scan_path("/index", "http://fixture.local") == "http://fixture.local/index"
+
+
+@pytest.mark.parametrize("address", ["100.64.0.1", "100.100.100.200", "100.127.255.254"])
+def test_cgnat_literal_origin_is_never_accepted(address):
+    # RFC 6598 shared address space: neither private nor reserved in
+    # Python's ipaddress semantics, but definitely not public scan space.
+    with pytest.raises(ValueError, match="blocked"):
+        validate_origin(f"https://{address}")
+
+
+@pytest.mark.parametrize("answers", [
+    ["100.64.0.1"],
+    ["93.184.216.34", "100.100.100.200"],
+    ["8.8.8.8", "100.127.255.254"],
+])
+def test_non_global_dns_answer_fails_closed_even_with_public_answers(answers):
+    with pytest.raises(ValueError, match="blocked"):
+        validate_scan_path("/home", "https://owned.example.test", lambda _: answers)
+
+
+def test_public_dns_answers_are_accepted_for_bounded_path_and_redirect():
+    resolver = lambda _: ["8.8.8.8", "93.184.216.34"]
+    assert validate_scan_path("/home", "https://owned.example.test", resolver) == "https://owned.example.test/home"
+    assert validate_redirect_chain(
+        ["https://owned.example.test/", "https://owned.example.test/home"],
+        "https://owned.example.test", resolver,
+    ) == ["https://owned.example.test/", "https://owned.example.test/home"]
+
+
+def test_non_global_redirect_dns_answer_is_rejected_even_on_same_origin():
+    answers = iter([["8.8.8.8"], ["8.8.8.8"], ["100.100.100.200"]])
+    with pytest.raises(ValueError, match="blocked"):
+        validate_redirect_chain(
+            ["https://owned.example.test/", "https://owned.example.test/next"],
+            "https://owned.example.test",
+            lambda _: next(answers),
+        )
+
+
+@pytest.mark.parametrize("runtime", ["development", "test", "staging", "production"])
+def test_https_fixture_cannot_bypass_dns_validation(monkeypatch, runtime):
+    monkeypatch.setenv("APP_ENV", runtime)
+    with pytest.raises(ValueError, match="fixture.local cannot be a public scan origin"):
+        validate_origin("https://fixture.local")
+    with pytest.raises(ValueError, match="fixture.local cannot be a public scan origin"):
+        validate_scan_path("/admin", "https://fixture.local", lambda _: ["8.8.8.8"])

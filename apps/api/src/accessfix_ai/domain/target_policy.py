@@ -38,14 +38,11 @@ def _is_blocked_address(value: str) -> bool:
         address = ipaddress.ip_address(value)
     except ValueError:
         return True
-    return (
-        address.is_private
-        or address.is_loopback
-        or address.is_link_local
-        or address.is_reserved
-        or address.is_unspecified
-        or address.is_multicast
-    )
+    # "not private" does not mean globally routable: e.g. RFC 6598
+    # shared/CGNAT 100.64.0.0/10 has is_private=False and
+    # is_reserved=False, but must never be eligible for outbound scans.
+    # Deny every non-global range, including future special-purpose ranges.
+    return not address.is_global
 
 
 def _checked_answers(host: str, resolver: Resolver) -> tuple[str, ...]:
@@ -70,6 +67,10 @@ def validate_origin(origin: str, allow_fixture: bool = True) -> str:
         return origin.rstrip("/")
     if p.scheme != "https" or not p.hostname or p.username or p.password or p.path not in ("", "/") or p.query or p.fragment:
         raise ValueError("only canonical HTTPS origins are allowed")
+    # The fixture is local-only. An HTTPS spelling must never bypass DNS
+    # validation or become a remotely scannable target.
+    if p.hostname.lower() == "fixture.local":
+        raise ValueError("fixture.local cannot be a public scan origin")
     try:
         # ip_address raises for DNS names; those are checked at connection time
         # by validate_redirect_chain/validate_scan_path with the resolver.
