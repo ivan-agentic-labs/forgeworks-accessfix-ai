@@ -121,15 +121,42 @@ class Store:
         with self.conn() as c:
             return c.execute("SELECT * FROM challenges WHERE tenant_id=? AND id=?", (tenant, challenge_id)).fetchone()
 
-    def verify(self, tenant: str, challenge_id: str):
-        with self.conn() as c:
-            row = c.execute("SELECT * FROM challenges WHERE tenant_id=? AND id=?", (tenant, challenge_id)).fetchone()
-            if not row:
+    def verify(self, tenant: str, challenge_id: str, expected_origin: str | None = None):
+        """Consume an unexpired challenge exactly once and bind the site origin.
+
+        The caller verifies the proof out of transaction. State changes must
+        therefore be conditional *inside* the transaction, including the
+        exact origin whose proof was fetched. A losing concurrent verifier
+        cannot re-verify a site or revive an expired/consumed challenge.
+        """
+        at = now()
+        with self.lock, self.conn(tenant) as c:
+            claimed = c.execute(
+                "UPDATE challenges SET used_at=? "
+                "WHERE tenant_id=? AND id=? AND used_at IS NULL AND expires_at>? "
+                "RETURNING site_id",
+                (at, tenant, challenge_id, at),
+            ).fetchone()
+            if not claimed:
                 return None
-            c.execute("UPDATE challenges SET used_at=? WHERE tenant_id=? AND id=? AND used_at IS NULL", (now(), tenant, challenge_id))
             verified_until = (datetime.now(timezone.utc) + timedelta(days=365)).isoformat().replace("+00:00", "Z")
-            c.execute("UPDATE sites SET status='VERIFIED',verified_until=? WHERE tenant_id=? AND id=?", (verified_until, tenant, row["site_id"]))
-            return c.execute("SELECT * FROM sites WHERE tenant_id=? AND id=?", (tenant, row["site_id"])).fetchone()
+            if expected_origin is not None:
+                updated = c.execute(
+                    "UPDATE sites SET status='VERIFIED',verified_until=? "
+                    "WHERE tenant_id=? AND id=? AND origin=? RETURNING *",
+                    (verified_until, tenant, claimed["site_id"], expected_origin),
+                ).fetchone()
+            else:
+                updated = c.execute(
+                    "UPDATE sites SET status='VERIFIED',verified_until=? "
+                    "WHERE tenant_id=? AND id=? RETURNING *",
+                    (verified_until, tenant, claimed["site_id"]),
+                ).fetchone()
+            if not updated:
+                # Raise to roll back the challenge consumption as well. This
+                # includes a site whose origin changed while proof was fetched.
+                raise ValueError("Site origin changed during challenge verification")
+            return updated
 
     def _idempotent_resource(self, tenant: str, principal: str, action: str, key: str | None, request_hash: str, resource_id: str) -> str:
         if not key:
