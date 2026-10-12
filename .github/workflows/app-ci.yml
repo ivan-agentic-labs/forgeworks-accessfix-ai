@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with: {python-version: '3.12'}
-      - run: python -m pip install -e 'apps/api[test]' -r scripts/requirements-verification.txt
+      - run: python -m pip install --require-hashes -r requirements-runtime.lock && python -m pip install -e 'apps/api[test]' -r scripts/requirements-verification.txt
       - run: python -W error -m pytest tests
       - run: python scripts/verify_bootstrap.py && python scripts/verify_contracts.py && python scripts/validate_openapi_independent.py
       - run: node --check apps/web/app.js
@@ -29,3 +29,5 @@ jobs:
         run: |
           npm ci --prefix packages/sdk
           npm run check --prefix packages/sdk
+      - name: Print runtime manifest for exact source verification
+        run: python scripts/runtime_manifest.py

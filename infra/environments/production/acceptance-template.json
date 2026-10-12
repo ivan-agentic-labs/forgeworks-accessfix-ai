@@ -1,0 +1,98 @@
+{
+  "algorithm": "Ed25519",
+  "key_id": "REQUIRES_TRUSTED_PUBLIC_KEY",
+  "signature": "UNSIGNED_NOT_ACCEPTED",
+  "payload": {
+    "schema": "forgeworks-production-acceptance-v1",
+    "product": "accessfix-ai",
+    "environment": "production",
+    "revision_sha": "REQUIRES_EXACT_REVIEWED_SHA",
+    "runtime_manifest_sha256": "REQUIRES_RUNTIME_FINGERPRINT",
+    "infrastructure": {
+      "railway_project_id": "REQUIRES_SEPARATE_PRODUCTION_PROJECT",
+      "railway_environment_id": "REQUIRES_SEPARATE_PRODUCTION_ENVIRONMENT",
+      "supabase_project_ref": "REQUIRES_SEPARATE_PRODUCTION_SUPABASE"
+    },
+    "issued_at": "REQUIRES_ACTUAL_REVIEW_TIME",
+    "expires_at": "REQUIRES_REVIEWED_VALIDITY_WINDOW",
+    "controls": [
+      {
+        "id": "authenticated-cross-tenant",
+        "status": "OPEN",
+        "evidence_uri": "REQUIRES_REVIEWED_EVIDENCE",
+        "evidence_sha256": "REQUIRES_EVIDENCE_DIGEST",
+        "reviewer": "REQUIRES_ACTUAL_REVIEWER"
+      },
+      {
+        "id": "authenticated-own-tenant",
+        "status": "OPEN",
+        "evidence_uri": "REQUIRES_REVIEWED_EVIDENCE",
+        "evidence_sha256": "REQUIRES_EVIDENCE_DIGEST",
+        "reviewer": "REQUIRES_ACTUAL_REVIEWER"
+      },
+      {
+        "id": "domain-review",
+        "status": "OPEN",
+        "evidence_uri": "REQUIRES_REVIEWED_EVIDENCE",
+        "evidence_sha256": "REQUIRES_EVIDENCE_DIGEST",
+        "reviewer": "REQUIRES_ACTUAL_REVIEWER"
+      },
+      {
+        "id": "load-slo",
+        "status": "OPEN",
+        "evidence_uri": "REQUIRES_REVIEWED_EVIDENCE",
+        "evidence_sha256": "REQUIRES_EVIDENCE_DIGEST",
+        "reviewer": "REQUIRES_ACTUAL_REVIEWER"
+      },
+      {
+        "id": "owner-release",
+        "status": "OPEN",
+        "evidence_uri": "REQUIRES_REVIEWED_EVIDENCE",
+        "evidence_sha256": "REQUIRES_EVIDENCE_DIGEST",
+        "reviewer": "REQUIRES_ACTUAL_REVIEWER"
+      },
+      {
+        "id": "privacy-legal",
+        "status": "OPEN",
+        "evidence_uri": "REQUIRES_REVIEWED_EVIDENCE",
+        "evidence_sha256": "REQUIRES_EVIDENCE_DIGEST",
+        "reviewer": "REQUIRES_ACTUAL_REVIEWER"
+      },
+      {
+        "id": "product-integration",
+        "status": "OPEN",
+        "evidence_uri": "REQUIRES_REVIEWED_EVIDENCE",
+        "evidence_sha256": "REQUIRES_EVIDENCE_DIGEST",
+        "reviewer": "REQUIRES_ACTUAL_REVIEWER"
+      },
+      {
+        "id": "restore-dr",
+        "status": "OPEN",
+        "evidence_uri": "REQUIRES_REVIEWED_EVIDENCE",
+        "evidence_sha256": "REQUIRES_EVIDENCE_DIGEST",
+        "reviewer": "REQUIRES_ACTUAL_REVIEWER"
+      },
+      {
+        "id": "security-review",
+        "status": "OPEN",
+        "evidence_uri": "REQUIRES_REVIEWED_EVIDENCE",
+        "evidence_sha256": "REQUIRES_EVIDENCE_DIGEST",
+        "reviewer": "REQUIRES_ACTUAL_REVIEWER"
+      },
+      {
+        "id": "session-revocation",
+        "status": "OPEN",
+        "evidence_uri": "REQUIRES_REVIEWED_EVIDENCE",
+        "evidence_sha256": "REQUIRES_EVIDENCE_DIGEST",
+        "reviewer": "REQUIRES_ACTUAL_REVIEWER"
+      },
+      {
+        "id": "storage-lifecycle",
+        "status": "OPEN",
+        "evidence_uri": "REQUIRES_REVIEWED_EVIDENCE",
+        "evidence_sha256": "REQUIRES_EVIDENCE_DIGEST",
+        "reviewer": "REQUIRES_ACTUAL_REVIEWER"
+      }
+    ]
+  }
+}

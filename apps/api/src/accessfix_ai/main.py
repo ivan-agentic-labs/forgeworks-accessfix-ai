@@ -125,6 +125,8 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
     app = FastAPI(title="AccessFix AI MVP", version="0.1.0", lifespan=lifespan)
     app.add_middleware(BodyBudgetMiddleware)
+    from accessfix_ai.presentation.operations import register_operations
+    register_operations(app, ROOT, "accessfix-ai")
     # The static fixture console is intentionally local-only. Never use a wildcard
     # origin or allow credentials here; production identity remains a future BFF.
     ui_origins = [
