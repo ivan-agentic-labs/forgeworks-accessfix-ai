@@ -17,7 +17,13 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -e 'apps/api[test]' playwright==1.63.0
       - run: python -m playwright install --with-deps chromium
-      - name: Verify rendered patch on synthetic fixture with denied requests
+      - name: Install fixed axe-core version for disposable fixture
+        run: |
+          mkdir -p "$RUNNER_TEMP/accessfix-axe"
+          npm --prefix "$RUNNER_TEMP/accessfix-axe" install --ignore-scripts --no-audit --no-fund --no-save axe-core@4.13.0
+          test -s "$RUNNER_TEMP/accessfix-axe/node_modules/axe-core/axe.min.js"
+          echo "ACCESSFIX_AXE_SCRIPT=$RUNNER_TEMP/accessfix-axe/node_modules/axe-core/axe.min.js" >> "$GITHUB_ENV"
+      - name: Verify rendered patch and axe image-alt on isolated fixture
         env:
           ACCESSFIX_DISPOSABLE_BROWSER: 'yes'
         run: python -W error -m pytest tests/browser -q
