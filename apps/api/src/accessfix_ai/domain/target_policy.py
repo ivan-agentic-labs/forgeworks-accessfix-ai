@@ -3,6 +3,7 @@ from __future__ import annotations
 import ipaddress
 import os
 import socket
+import unicodedata
 from collections.abc import Callable, Iterable
 from urllib.parse import urlparse
 
@@ -19,7 +20,11 @@ Resolver = Callable[[str], Iterable[str]]
 
 def _reject_unsafe_url_bytes(value: str) -> None:
     """Never let URL parser normalization change the checked target."""
-    if not isinstance(value, str) or any(ord(ch) <= 0x20 or ord(ch) == 0x7f or ch == "\\" for ch in value):
+    if not isinstance(value, str) or any(
+        ord(ch) <= 0x20 or ord(ch) == 0x7f or ch == "\\"
+        or unicodedata.category(ch) in {"Cc", "Cf", "Cs", "Zl", "Zp"}
+        for ch in value
+    ):
         raise ValueError("unsafe URL characters")
 
 
