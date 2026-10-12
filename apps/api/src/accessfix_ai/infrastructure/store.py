@@ -358,6 +358,16 @@ class Store:
                     raise ValueError("Patch integrity mismatch")
             except (ValueError, TypeError):
                 return row, "SOURCE_INTEGRITY_FAILED"
+            # Digest equivalence proves the patch bytes are unchanged; it does
+            # NOT prove the reported accessibility defect was repaired.
+            # Re-run the supported deterministic image-alt rule on the rebuilt
+            # source and block review if the original selector still fails.
+            try:
+                remaining = image_alt_findings(rebuilt["patched_source"])
+            except (ValueError, TypeError, UnicodeError):
+                return row, "RETEST_FINDING_PERSISTS"
+            if any(item["selector"] == finding["selector"] for item in remaining):
+                return row, "RETEST_FINDING_PERSISTS"
             changed = c.execute("UPDATE proposals SET retest_status='PASSED',status='PENDING_REVIEW',version=version+1 WHERE tenant_id=? AND id=? AND version=? AND status='PENDING_RETEST'", (tenant, proposal_id, expected_version)).rowcount
             if not changed:
                 return row, "STALE"
