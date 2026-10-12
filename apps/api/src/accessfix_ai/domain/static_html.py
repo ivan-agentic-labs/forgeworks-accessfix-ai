@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import unicodedata
 import difflib
 from html import escape
 from html.parser import HTMLParser
@@ -73,8 +74,11 @@ def build_image_alt_patch(source: bytes, identifier: str, alt_text: str) -> dict
         raise ValueError("A safe unique image ID is required")
     if not isinstance(alt_text, str) or not alt_text.strip() or len(alt_text) > 500:
         raise ValueError("Supply a nonempty owner-authored label of at most 500 characters")
-    if any(ord(c) < 32 or ord(c) == 127 for c in alt_text):
-        raise ValueError("Control characters are not allowed in alternative text")
+    if any(
+        unicodedata.category(char) in {"Cc", "Cf", "Cs", "Zl", "Zp"}
+        for char in alt_text
+    ):
+        raise ValueError("Invisible Unicode control characters are not allowed in alternative text")
     text = source.decode("utf-8")
     # HTMLParser advances line numbers only at LF, not every Unicode separator.
     starts = [0] + [index + 1 for index, char in enumerate(text) if char == "\n"]
