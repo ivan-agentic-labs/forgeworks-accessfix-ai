@@ -53,3 +53,22 @@ jobs:
           grep -q 'RESTORED_SCHEMA_OBJECT_DRIFT' /tmp/fw-restore-negative-check.log
           "$PSQL" -h 127.0.0.1 -p 5438 -U postgres -d forgeworks_restore -v ON_ERROR_STOP=1 -c 'DROP INDEX public.fw_disposable_restore_drift_probe'
           python scripts/verify_disposable_restore.py
+
+      - name: Reject loss of FORCE RLS on a recovered tenant membership table
+        env:
+          PGPASSWORD: synthetic-disposable-ci-only
+          G1_DISPOSABLE_DB: 'yes'
+          FW_DISPOSABLE_OWNER_DSN: 'host=127.0.0.1 port=5438 dbname=forgeworks_runtime user=postgres password=synthetic-disposable-ci-only'
+          FW_PRODUCT_MODULE: accessfix_ai
+        run: |
+          set -eu
+          PSQL=/usr/lib/postgresql/17/bin/psql
+          # Only the fresh forgeworks_restore DB on local disposable port 5438.
+          "$PSQL" -h 127.0.0.1 -p 5438 -U postgres -d forgeworks_restore -v ON_ERROR_STOP=1 -c 'ALTER TABLE public.memberships NO FORCE ROW LEVEL SECURITY'
+          if python scripts/verify_disposable_restore.py > /tmp/fw-restored-rls-negative.log 2>&1; then
+            echo 'ERROR: recovery verifier accepted missing FORCE RLS'
+            exit 1
+          fi
+          grep -q 'RESTORED_TENANT_RLS_REQUIRED' /tmp/fw-restored-rls-negative.log
+          "$PSQL" -h 127.0.0.1 -p 5438 -U postgres -d forgeworks_restore -v ON_ERROR_STOP=1 -c 'ALTER TABLE public.memberships FORCE ROW LEVEL SECURITY'
+          python scripts/verify_disposable_restore.py
