@@ -165,11 +165,14 @@ def validate_redirect_chain(
     if len(urls) - 1 > MAX_REDIRECTS:
         raise ValueError("redirect limit exceeded")
     verified_origin = validate_origin(verified_origin)
-    resolve = resolver or _resolve
-    baseline = _checked_answers(urlparse(verified_origin).hostname or "", resolve)
+    # Reject every malformed/cross-origin hop before making even a DNS query.
+    # A later untrusted redirect must not trigger network work when invalid.
     for url in urls:
         if not _same_origin(url, verified_origin):
             raise ValueError("redirect leaves verified origin")
+    resolve = resolver or _resolve
+    baseline = _checked_answers(urlparse(verified_origin).hostname or "", resolve)
+    for url in urls:
         parsed = urlparse(url)
         current = _checked_answers(parsed.hostname or "", resolve)
         if current != baseline:
