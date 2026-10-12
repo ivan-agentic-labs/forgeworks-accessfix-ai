@@ -168,3 +168,21 @@ def test_protocol_relative_paths_are_not_normalized_to_verified_origin(path):
         validate_scan_request([path])
     with pytest.raises(ValueError, match="protocol-relative"):
         validate_scan_path(path, "https://owned.example.test", lambda _: (_ for _ in ()).throw(AssertionError("DNS must not run")))
+
+
+@pytest.mark.parametrize("origin", [
+    "https://owned.example.test:444", "https://owned.example.test:8443",
+    "https://owned.example.test:65535",
+])
+def test_owned_site_nonstandard_https_port_denied_before_network(origin):
+    with pytest.raises(ValueError, match="only HTTPS port 443"):
+        validate_origin(origin)
+    with pytest.raises(ValueError, match="only HTTPS port 443"):
+        validate_scan_path("/health", origin, lambda _: (_ for _ in ()).throw(AssertionError("no outbound DNS")))
+
+
+def test_explicit_standard_tls_port_permitted_when_dns_is_public():
+    assert validate_origin("https://owned.example.test:443") == "https://owned.example.test:443"
+    assert validate_scan_path(
+        "/status", "https://owned.example.test:443", lambda _: ["93.184.216.34"]
+    ) == "https://owned.example.test:443/status"

@@ -67,6 +67,11 @@ def validate_origin(origin: str, allow_fixture: bool = True) -> str:
         return origin.rstrip("/")
     if p.scheme != "https" or not p.hostname or p.username or p.password or p.path not in ("", "/") or p.query or p.fragment:
         raise ValueError("only canonical HTTPS origins are allowed")
+    # Remote proof fetches and the isolated scanner contract are pinned to TLS
+    # port 443. Accepting a nonstandard port only at the scan boundary would
+    # create an inconsistent ownership/egress policy.
+    if p.port not in (None, 443):
+        raise ValueError("only HTTPS port 443 is supported")
     # The fixture is local-only. An HTTPS spelling must never bypass DNS
     # validation or become a remotely scannable target.
     if p.hostname.lower() == "fixture.local":
