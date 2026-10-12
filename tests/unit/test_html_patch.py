@@ -50,3 +50,17 @@ def test_patch_preserves_every_existing_image_attribute(source):
     before = attributes(source)
     result = build_image_alt_patch(source, 'hero', 'Owner supplied label')
     assert attributes(result['patched_source']) == {**before, 'alt':'Owner supplied label'}
+
+
+@pytest.mark.parametrize("control", [
+    "\u0085", "\u200b", "\u200d", "\u202e", "\u2066", "\u2028", "\u2029", "\ufeff",
+])
+def test_owner_authored_alt_text_cannot_hide_unicode_control_characters(control):
+    with pytest.raises(ValueError, match="Invisible Unicode control"):
+        build_image_alt_patch(b'<img id="hero">', "hero", "Visible description" + control + "misleading")
+
+
+def test_normal_international_alt_text_still_generates_applicable_patch():
+    patch = build_image_alt_patch(b'<img id="hero">', "hero", "Kucing tidur di café")
+    assert "Kucing tidur di café".encode() in patch["patched_source"]
+    assert patch["static_retest"] == "PASSED"
