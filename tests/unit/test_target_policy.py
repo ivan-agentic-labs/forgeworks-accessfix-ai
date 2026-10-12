@@ -186,3 +186,27 @@ def test_explicit_standard_tls_port_permitted_when_dns_is_public():
     assert validate_scan_path(
         "/status", "https://owned.example.test:443", lambda _: ["93.184.216.34"]
     ) == "https://owned.example.test:443/status"
+
+
+@pytest.mark.parametrize("control", [
+    "\u0085", "\u200b", "\u200d", "\u202e", "\u2066", "\u2028", "\u2029", "\ufeff",
+])
+def test_invisible_unicode_url_control_characters_rejected_before_dns(control):
+    resolver = lambda _: (_ for _ in ()).throw(AssertionError("DNS must not run"))
+    with pytest.raises(ValueError, match="unsafe URL characters"):
+        validate_origin("https://owned.example.test" + control)
+    with pytest.raises(ValueError, match="unsafe URL characters"):
+        validate_scan_request(["/dashboard" + control])
+    with pytest.raises(ValueError, match="unsafe URL characters"):
+        validate_scan_path("/dashboard" + control, "https://owned.example.test", resolver)
+    with pytest.raises(ValueError, match="unsafe URL characters"):
+        validate_redirect_chain(
+            ["https://owned.example.test/", "https://owned.example.test/" + control],
+            "https://owned.example.test",
+            resolver,
+        )
+
+
+def test_visible_utf8_scan_path_remains_valid():
+    resolver = lambda _: ["93.184.216.34"]
+    assert validate_scan_path("/café", "https://owned.example.test", resolver) == "https://owned.example.test/café"

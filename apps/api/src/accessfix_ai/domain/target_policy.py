@@ -3,6 +3,7 @@ from __future__ import annotations
 import ipaddress
 import os
 import socket
+import unicodedata
 from collections.abc import Callable, Iterable
 from urllib.parse import urlparse
 
@@ -19,7 +20,11 @@ Resolver = Callable[[str], Iterable[str]]
 
 def _reject_unsafe_url_bytes(value: str) -> None:
     """Never let URL parser normalization change the checked target."""
-    if not isinstance(value, str) or any(ord(ch) <= 0x20 or ord(ch) == 0x7f or ch == "\\" for ch in value):
+    if not isinstance(value, str) or any(
+        ord(ch) <= 0x20 or ord(ch) == 0x7f or ch == "\\"
+        or unicodedata.category(ch) in {"Cc", "Cf", "Cs", "Zl", "Zp"}
+        for ch in value
+    ):
         raise ValueError("unsafe URL characters")
 
 
@@ -160,11 +165,14 @@ def validate_redirect_chain(
     if len(urls) - 1 > MAX_REDIRECTS:
         raise ValueError("redirect limit exceeded")
     verified_origin = validate_origin(verified_origin)
-    resolve = resolver or _resolve
-    baseline = _checked_answers(urlparse(verified_origin).hostname or "", resolve)
+    # Reject every malformed/cross-origin hop before making even a DNS query.
+    # A later untrusted redirect must not trigger network work when invalid.
     for url in urls:
         if not _same_origin(url, verified_origin):
             raise ValueError("redirect leaves verified origin")
+    resolve = resolver or _resolve
+    baseline = _checked_answers(urlparse(verified_origin).hostname or "", resolve)
+    for url in urls:
         parsed = urlparse(url)
         current = _checked_answers(parsed.hostname or "", resolve)
         if current != baseline:
