@@ -66,6 +66,10 @@ def validate_origin(origin: str, allow_fixture: bool = True) -> str:
         p.port  # Force malformed port numbers to fail at the validation boundary.
     except ValueError as exc:
         raise ValueError("invalid HTTPS origin port") from exc
+    # urllib.parse reports empty userinfo as an empty string, not None.
+    # Truthiness checks on username/password therefore miss @host and :@host.
+    if "@" in p.netloc:
+        raise ValueError("userinfo is forbidden in verified origins")
     if allow_fixture and os.getenv("APP_ENV", "development") in {"development", "test"} and p.hostname == "fixture.local" and p.scheme == "http":
         if p.username or p.password or p.path not in ("", "/") or p.query or p.fragment or p.port:
             raise ValueError("only canonical fixture origins are allowed")
@@ -104,6 +108,7 @@ def _same_origin(candidate: str, origin: str) -> bool:
         and target.hostname is not None
         and target.hostname.lower() == (verified.hostname or "").lower()
         and target.port == verified.port
+        and "@" not in target.netloc
         and not target.username
         and not target.password
     )
