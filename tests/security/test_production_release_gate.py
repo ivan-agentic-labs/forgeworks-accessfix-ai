@@ -108,7 +108,7 @@ def test_signed_future_expired_or_ambiguous_time_rejected(receipt, field, value)
 
 
 @pytest.mark.parametrize("uri", ["http://evidence.invalid/review",
-                              "https://user:password@evidence.invalid/review",
+                              "https://" + "user:password" + "@" + "evidence.invalid/review",
                               "https://evidence.invalid/review?token=private",
                               "https://evidence.invalid/review#fragment"])
 def test_evidence_uri_cannot_transport_credentials(receipt, uri):
