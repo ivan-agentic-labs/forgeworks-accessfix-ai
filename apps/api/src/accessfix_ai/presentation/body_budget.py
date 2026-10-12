@@ -36,6 +36,7 @@ class BodyBudgetMiddleware:
             if int(lengths[0]) > self.max_bytes:
                 return await reject(413, "REQUEST_BODY_TOO_LARGE", "Request exceeds the 8 MiB body budget")
 
+        declared_size = int(lengths[0]) if lengths else None
         chunks, size, count = [], 0, 0
         while True:
             event = await receive()
@@ -48,11 +49,15 @@ class BodyBudgetMiddleware:
             count += 1
             if size > self.max_bytes or count > self.max_chunks:
                 return await reject(413, "REQUEST_BODY_TOO_LARGE", "Request exceeds the bounded body budget")
+            if declared_size is not None and size > declared_size:
+                return await reject(400, "INVALID_CONTENT_LENGTH", "Content-Length differs from received bytes")
             if body:
                 chunks.append(body)
             if not event.get("more_body", False):
                 break
 
+        if declared_size is not None and size != declared_size:
+            return await reject(400, "INVALID_CONTENT_LENGTH", "Content-Length differs from received bytes")
         content = b"".join(chunks)
         consumed = False
 
