@@ -363,6 +363,8 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             return problem(409, "REVISION_MISMATCH", "Retest must use the proposal base revision")
         if status == "SOURCE_INTEGRITY_FAILED":
             return problem(409, "SOURCE_INTEGRITY_FAILED", "Stored source or patch failed integrity and static retest")
+        if status == "RETEST_FINDING_PERSISTS":
+            return problem(409, "RETEST_FINDING_PERSISTS", "Accessibility finding persists after the source patch")
         return {
             "id": str(proposal_id),
             "status": "ACCEPTED",
