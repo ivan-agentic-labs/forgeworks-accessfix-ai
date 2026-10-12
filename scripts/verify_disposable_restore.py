@@ -27,6 +27,19 @@ def snapshot(dsn):
     return result
 
 
+
+def schema_catalog(dsn):
+    """Compare non-table objects after logical recovery of a disposable database."""
+    checks = {
+        "indexes": "SELECT schemaname, tablename, indexname, indexdef FROM pg_indexes WHERE schemaname='public' ORDER BY 1,2,3",
+        "sequences": "SELECT schemaname, sequencename, data_type, start_value, min_value, max_value, increment_by, cycle, cache_size, last_value FROM pg_sequences WHERE schemaname='public' ORDER BY 1,2",
+        "views": "SELECT schemaname, viewname, definition FROM pg_views WHERE schemaname='public' ORDER BY 1,2",
+        "functions": "SELECT p.proname,pg_get_function_identity_arguments(p.oid),pg_get_functiondef(p.oid) FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid WHERE n.nspname='public' ORDER BY 1,2",
+        "extensions": "SELECT extname,extversion FROM pg_extension ORDER BY extname",
+    }
+    with psycopg.connect(dsn) as db:
+        return {name: db.execute(query).fetchall() for name, query in checks.items()}
+
 def main():
     info = conninfo_to_dict(os.environ['FW_DISPOSABLE_OWNER_DSN'])
     if os.getenv('G1_DISPOSABLE_DB')!='yes' or info.get('host') not in {'localhost','127.0.0.1'} or info.get('dbname')!='forgeworks_runtime':
@@ -34,7 +47,9 @@ def main():
     restored = {**info,'dbname':'forgeworks_restore'}
     before, after = snapshot(make_conninfo(**info)), snapshot(make_conninfo(**restored))
     if not before or before!=after:
-        raise SystemExit('Logical backup/restore differs in schema/table data digests')
+        raise SystemExit('RESTORED_TABLE_OR_POLICY_DRIFT: data, table or tenant policies differ')
+    if schema_catalog(make_conninfo(**info)) != schema_catalog(make_conninfo(**restored)):
+        raise SystemExit('RESTORED_SCHEMA_OBJECT_DRIFT: restored non-table database objects differ')
     module = importlib.import_module(os.environ['FW_PRODUCT_MODULE']+'.infrastructure.postgres_store')
     login = {**restored,'user':'fw_runtime_test','password':'synthetic-local-runtime-test-only'}
     store = module.PostgresStore(make_conninfo(**login))
