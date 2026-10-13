@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0",
+  "record_id": "accessfix.baseline.2026-10-13",
+  "repository": "ivan-agentic-labs/forgeworks-accessfix-ai",
+  "product": "AccessFix AI",
+  "record_type": "baseline_snapshot",
+  "recorded_on": "2026-10-14",
+  "evaluated_source_commit": "9d9cbb625058db0de60d94955b39bc5343b7bdfd",
+  "gate_assessment": {
+    "g1_d": "CONDITIONAL_PENDING_SIGNOFF",
+    "g1_e": "PARTIAL_OPEN_BLOCKED",
+    "production_acceptance": "NOT_ACCEPTED"
+  },
+  "evidence": [
+    {
+      "kind": "application_ci",
+      "name": "AccessFix MVP Application CI",
+      "status": "PASS",
+      "run_id": "38428520504",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/38428520504",
+      "environment": "CI",
+      "workflow_commit": "9d9cbb625058db0de60d94955b39bc5343b7bdfd",
+      "subject_commit": "9d9cbb625058db0de60d94955b39bc5343b7bdfd",
+      "subject_identity": "VERIFIED",
+      "scope": "Application test suite and configured CI checks for the exact checkout SHA.",
+      "limitations": ["CI success does not prove remote-site scanning, authenticated customer acceptance, or production readiness."]
+    },
+    {
+      "kind": "contract_validation",
+      "name": "G1 Contract Verification",
+      "status": "PASS",
+      "run_id": "38428520091",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/38428520091",
+      "environment": "CI",
+      "workflow_commit": "9d9cbb625058db0de60d94955b39bc5343b7bdfd",
+      "subject_commit": "9d9cbb625058db0de60d94955b39bc5343b7bdfd",
+      "subject_identity": "VERIFIED",
+      "scope": "Bootstrap, event-schema, contract, and independent OpenAPI verification.",
+      "limitations": ["Static contract checks do not establish production accessibility or external scanner security."]
+    },
+    {
+      "kind": "postgres_runtime",
+      "name": "AccessFix PostgreSQL Runtime Proof",
+      "status": "PASS",
+      "run_id": "38428520149",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/38428520149",
+      "environment": "DISPOSABLE",
+      "workflow_commit": "9d9cbb625058db0de60d94955b39bc5343b7bdfd",
+      "subject_commit": "9d9cbb625058db0de60d94955b39bc5343b7bdfd",
+      "subject_identity": "VERIFIED",
+      "scope": "Disposable PostgreSQL tenant/RLS, runtime, and logical restore proof.",
+      "limitations": ["Disposable logical restore does not prove production PITR, regional recovery, or RTO/RPO."]
+    },
+    {
+      "kind": "browser_fixture",
+      "name": "Disposable Chromium Patch Proof",
+      "status": "PASS",
+      "run_id": "38428520286",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/38428520286",
+      "environment": "DISPOSABLE",
+      "workflow_commit": "9d9cbb625058db0de60d94955b39bc5343b7bdfd",
+      "subject_commit": "9d9cbb625058db0de60d94955b39bc5343b7bdfd",
+      "subject_identity": "VERIFIED",
+      "scope": "Browser and patch behavior on disposable local fixture inputs.",
+      "limitations": ["A fixture browser proof is not a remote website scan, egress/security audit, or human accessibility review."]
+    },
+    {
+      "kind": "staging_readiness",
+      "name": "AccessFix staging public readiness smoke",
+      "status": "PASS",
+      "run_id": "38428520295",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/38428520295",
+      "environment": "STAGING",
+      "workflow_commit": "9d9cbb625058db0de60d94955b39bc5343b7bdfd",
+      "subject_commit": null,
+      "subject_identity": "UNKNOWN",
+      "scope": "Public health/readiness, anonymous protected-route denial, and public auth-client configuration checks.",
+      "limitations": ["The deployed service SHA is not proven by this smoke record.", "This is not authenticated product or customer acceptance."]
+    }
+  ],
+  "limitations": [
+    "G1-D remains conditional/pending signoff and G1-E remains partial/open/blocked; green CI does not change those statuses.",
+    "AX-T01 through AX-T06 are not established as passed by these workflow runs; the recorded plan marks them not run.",
+    "The staging smoke workflow commit does not identify the deployed application commit or prove remote scanning safety."
+  ],
+  "source_documents": [
+    {"path": "docs/verification/CURRENT_GATE_EVIDENCE.md", "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/blob/9d9cbb625058db0de60d94955b39bc5343b7bdfd/docs/verification/CURRENT_GATE_EVIDENCE.md"},
+    {"path": "docs/verification/DESIGN_GATE_STATUS.md", "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/blob/9d9cbb625058db0de60d94955b39bc5343b7bdfd/docs/verification/DESIGN_GATE_STATUS.md"},
+    {"path": "docs/verification/TEST_PLAN.md", "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/blob/9d9cbb625058db0de60d94955b39bc5343b7bdfd/docs/verification/TEST_PLAN.md"}
+  ]
+}
