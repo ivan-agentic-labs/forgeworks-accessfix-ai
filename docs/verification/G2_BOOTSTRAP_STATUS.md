@@ -1,9 +1,11 @@
-# G2 bootstrap status — 2026-10-09
+# Historical G2 bootstrap: current status redirect (2026-10-13)
 
-Owner: `ivan-agentic-labs`. Repository bootstrap and scoped engineering verification are complete for the tested source receipt. Engineering now proceeds directly on main under the latest owner authorization. The repository remains private and independent.
+This path previously contained the **2026-10-09 bootstrap snapshot**. That material is available in Git history and original owner archive, but its repo visibility and implementation stage are **not current**. Do not use it as the release status.
 
-Current evidence and exact commit/run links: [CURRENT_GATE_EVIDENCE.md](CURRENT_GATE_EVIDENCE.md) and [main source receipt](../evidence/MAIN_VERIFICATION_2026-10-09.json). Historical receipts retain their original scope.
+For the latest status, consult:
+- [Active owner specification](../specifications/PRODUCT_SPECIFICATION_2026-10-13.md)
+- [Five services / one ForgeWorks application](../platform/ONE_APP_FIVE_SERVICES.md)
+- [Current engineering gate evidence](CURRENT_GATE_EVIDENCE.md)
+- [Hosted acceptance procedure](../../ops/runbooks/RUNTIME_RELEASE_VERIFICATION.md)
 
-Contracts/client compilation, complete application tests, implemented PostgreSQL MVP runtime with negative RLS/concurrency checks and disposable logical restore have passed. These are scoped results; G1-E remains OPEN/BLOCKED. Real identities/BFF, external storage/source ingestion, sandbox/provider/product GitHub App effects, PITR/load/regional recovery and independent acceptance remain unfinished or blocked. No production deployment or customer data is used.
-
-CI database credentials are intentionally synthetic and confined to fresh disposable localhost services.
+**GitHub visibility as inspected on 2026-10-13: public.** This observation is not an independent confirmation of deployed security, production readiness or domain routing. G1-E / independent production acceptance remains OPEN until environment-specific proof and signoff.
