@@ -1,0 +1,68 @@
+{
+  "schema": "forgeworks-runtime-rls-startup-evidence-v1",
+  "date": "2026-10-14",
+  "product": "accessfix-ai",
+  "implementation_commit": "a1f7f3feab83cbe1ba7b7432910d0367dcae7615",
+  "changes": [
+    "Require every runtime tenant table in the active schema",
+    "Reject disabled RLS or missing FORCE RLS before runtime initialization",
+    "Scope legacy information_schema migration checks to the active schema"
+  ],
+  "ci": [
+    {
+      "name": "AccessFix MVP Application CI",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/38461660562"
+    },
+    {
+      "name": "AccessFix PostgreSQL Runtime Proof",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/38461660679"
+    },
+    {
+      "name": "AccessFix Staging Public Readiness",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/38461660758"
+    },
+    {
+      "name": "G1 Contract Verification",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/38461660714"
+    },
+    {
+      "name": "AccessFix Disposable Chromium Patch Proof",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/38461660950"
+    }
+  ],
+  "disposable_proof": "Each required table has RLS disabled and FORCE RLS removed in turn; startup must reject each drift; missing memberships table is also rejected; protections restored in finally. PostgreSQL runtime CI passed.",
+  "hosted_supabase": {
+    "project_ref": "fljekuwplgkrpdoajyhn",
+    "catalog_tables": 62,
+    "rls_and_force_rls_tables": 62,
+    "scope": "Read-only catalog across the five product schemas; runtime role SET ROLE denied by connector. No new authenticated tenant isolation proof."
+  },
+  "railway": {
+    "project_id": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
+    "environment_id": "0395e7ac-10f8-4004-8bb7-ddee901343c7",
+    "pending_patch": "606aebb5-0fe6-4980-8135-8396d4ef67d7",
+    "source_pin": "a1f7f3feab83cbe1ba7b7432910d0367dcae7615",
+    "release_sha": "a1f7f3feab83cbe1ba7b7432910d0367dcae7615",
+    "status": "STAGED_NOT_DEPLOYED",
+    "blocking_tool_result": "Cancelled — the user did not approve this action. No changes were made.",
+    "live_health": "All five healthz and readyz endpoints returned 200; currently running older releases."
+  },
+  "remaining": [
+    "Approve prepared Railway environment patch, then verify deployed revision and manifest",
+    "Hosted authenticated product acceptance and tenant isolation",
+    "Supabase leaked-password protection warning remains open",
+    "Unified portal, representative SLO, hosted DR and production acceptance remain open"
+  ],
+  "production_acceptance": "NOT_ACCEPTED",
+  "excluded_project": "SealAngel"
+}
