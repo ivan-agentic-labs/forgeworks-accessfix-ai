@@ -71,6 +71,33 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
         with psycopg.connect(owner) as migration:
             migration.execute('ALTER TABLE fw_memberships_drift_probe RENAME TO memberships')
     store=PostgresStore(runtime)
+    # Force a single backend to prove reuse and transaction-local cleanup.
+    store._pool.resize(1, 1)
+    with store.conn(TENANT) as db:
+        backend = db.execute('SELECT pg_backend_pid()').fetchone()[0]
+        db.execute("SELECT set_config('request.jwt.claim.sub', ?, true)", (str(USER),))
+    with store.conn(other) as db:
+        assert db.execute('SELECT pg_backend_pid()').fetchone()[0] == backend
+        assert db.execute("SELECT nullif(current_setting('request.jwt.claim.sub', true), '')").fetchone()[0] is None
+        assert db.execute('SELECT count(*) FROM memberships').fetchone()[0] == 0
+        with pytest.raises(ValueError, match='Nested transaction cannot change'):
+            with store.conn(TENANT):
+                pass
+    with store._pool.connection() as db:
+        assert db.execute('SELECT current_user').fetchone()['current_user'] == 'fw_runtime_test'
+        assert db.execute("SELECT nullif(current_setting('app.tenant_id', true), '') AS tenant").fetchone()['tenant'] is None
+        assert db.execute('SELECT count(*) AS n FROM memberships').fetchone()['n'] == 0
+    with pytest.raises(RuntimeError, match='pool rollback fixture'):
+        with store.conn(TENANT) as db:
+            db.execute("SELECT set_config('request.jwt.claim.sub', ?, true)", (str(USER),))
+            raise RuntimeError('pool rollback fixture')
+    assert store.member_role(TENANT, USER) is not None
+    with pytest.raises(psycopg.errors.DivisionByZero):
+        with store.conn(TENANT) as db:
+            db.execute('SELECT 1/0')
+    with store.conn(other) as db:
+        assert db.execute('SELECT pg_backend_pid()').fetchone()[0] == backend
+        assert db.execute('SELECT count(*) FROM memberships').fetchone()[0] == 0
     assert store.member_role(TENANT, USER) == 'editor'
     # Verify an actual status change revokes authorization immediately.
     # This runs against the explicitly disposable localhost PostgreSQL fixture.
@@ -187,3 +214,7 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
         assert len(exported.json()['bundle_sha256'])==64
         job=client.get(f"/v1/jobs/{store.get_scan(TENANT,scan_id)['job_id']}",headers=hdr('job:read'))
         assert job.status_code==200 and job.json()['state']=='SUCCEEDED'
+
+    store.close()
+    for peer in locals().get("peers", []):
+        peer.close()

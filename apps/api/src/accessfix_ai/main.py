@@ -144,11 +144,20 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        start_pool = getattr(store, "start_pool", None)
+        if start_pool:
+            start_pool()
         thread = threading.Thread(target=worker, daemon=True, name="accessfix-worker")
-        thread.start()
-        yield
-        stop.set()
-        thread.join(1)
+        try:
+            thread.start()
+            yield
+        finally:
+            stop.set()
+            if thread.ident is not None:
+                thread.join(5)
+            close_store = getattr(store, "close", None)
+            if close_store:
+                close_store()
 
     app = FastAPI(title="AccessFix AI MVP", version="0.1.0", lifespan=lifespan)
     app.add_middleware(BodyBudgetMiddleware)

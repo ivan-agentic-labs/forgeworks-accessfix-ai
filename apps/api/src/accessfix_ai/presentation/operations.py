@@ -14,6 +14,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import Header, HTTPException
+from psycopg_pool import PoolTimeout, TooManyRequests
 from starlette.responses import JSONResponse
 
 MAX_MANIFEST_FILES = 256
@@ -169,6 +170,18 @@ class RequestTelemetryMiddleware:
 
 
 def register_operations(app, root: Path, product: str) -> None:
+    async def database_busy(request, error):
+        # Saturation is temporary; never disclose connection strings or pool errors.
+        return JSONResponse(
+            {"type": "about:blank", "title": "Service temporarily busy", "status": 503,
+             "code": "DATABASE_BUSY", "request_id": "runtime"},
+            status_code=503, headers={"Retry-After": "1"},
+            media_type="application/problem+json",
+        )
+
+    app.add_exception_handler(PoolTimeout, database_busy)
+    app.add_exception_handler(TooManyRequests, database_busy)
+
     metrics = RequestMetrics()
     app.state.request_metrics = metrics
     logger = logging.getLogger("forgeworks.http")
