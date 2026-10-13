@@ -16,6 +16,7 @@ from uuid import UUID, uuid4
 import psycopg
 from psycopg.rows import dict_row
 
+from accessfix_ai.infrastructure.security_catalog import verify_tenant_catalog
 from accessfix_ai.infrastructure.store import Store, now, later, validate_attempt_budget
 
 TENANT_CONTEXT = ContextVar("accessfix_tenant", default=None)
@@ -102,11 +103,12 @@ class PostgresStore(Store):
             attributes = db.execute("SELECT rolsuper, rolbypassrls, rolcanlogin, rolcreaterole, rolcreatedb FROM pg_roles WHERE rolname=%s", (ROLE,)).fetchone()
             if not attributes or any(attributes.values()):
                 raise ValueError("Tenant group role must be NOLOGIN, NOSUPERUSER and NOBYPASSRLS")
-            if not db.execute("SELECT 1 FROM information_schema.columns WHERE table_name='scan_jobs' AND column_name='lease_until'").fetchone():
+            verify_tenant_catalog(db)
+            if not db.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='scan_jobs' AND column_name='lease_until'").fetchone():
                 raise ValueError("Apply migration 002 with the migration role before starting runtime")
-            if not db.execute("SELECT 1 FROM information_schema.tables WHERE table_name='scan_sources'").fetchone():
+            if not db.execute("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='scan_sources'").fetchone():
                 raise ValueError("Apply migration 003 before starting runtime")
-            if not db.execute("SELECT 1 FROM information_schema.tables WHERE table_name='proposal_sources'").fetchone():
+            if not db.execute("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='proposal_sources'").fetchone():
                 raise ValueError("Apply migration 004 before starting runtime")
             if db.execute("SELECT 1 FROM pg_tables WHERE schemaname=current_schema() AND tablename='proposal_sources' AND tableowner IN (current_user, %s)", (ROLE,)).fetchone():
                 raise ValueError("Runtime must not own product patch tables")

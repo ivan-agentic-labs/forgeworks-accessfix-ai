@@ -7,6 +7,7 @@ import psycopg
 import pytest
 from psycopg.conninfo import conninfo_to_dict,make_conninfo
 from accessfix_ai.infrastructure.store import TENANT,USER,SITE
+from accessfix_ai.infrastructure.security_catalog import REQUIRED_TENANT_TABLES
 from accessfix_ai.infrastructure.postgres_store import PostgresStore, ROLE
 from accessfix_ai.worker import ScanWorker,WorkerConfig
 
@@ -46,6 +47,29 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
         db.execute('INSERT INTO sites VALUES(%s,%s,%s,%s,%s,%s)',(TENANT,SITE,'http://fixture.local',str(uuid4()),'UNVERIFIED',None))
     info.update(user='fw_runtime_test',password='synthetic-local-runtime-test-only');runtime=make_conninfo(**info)
     with pytest.raises(ValueError,match='superuser'):PostgresStore(owner)
+    # Real PostgreSQL catalog mutations, confined to this disposable fixture.
+    # Existing RLS policy text must not hide disabled RLS or missing FORCE RLS.
+    for table in REQUIRED_TENANT_TABLES:
+        for drift, restore in [('DISABLE ROW LEVEL SECURITY', 'ENABLE ROW LEVEL SECURITY'),
+                               ('NO FORCE ROW LEVEL SECURITY', 'FORCE ROW LEVEL SECURITY')]:
+            with psycopg.connect(owner) as migration:
+                migration.execute(psycopg.sql.SQL('ALTER TABLE {} ' + drift).format(
+                    psycopg.sql.Identifier(table)))
+            try:
+                with pytest.raises(ValueError, match='RUNTIME_TENANT_RLS_REQUIRED'):
+                    PostgresStore(runtime)
+            finally:
+                with psycopg.connect(owner) as migration:
+                    migration.execute(psycopg.sql.SQL('ALTER TABLE {} ' + restore).format(
+                        psycopg.sql.Identifier(table)))
+    with psycopg.connect(owner) as migration:
+        migration.execute('ALTER TABLE memberships RENAME TO fw_memberships_drift_probe')
+    try:
+        with pytest.raises(ValueError, match='RUNTIME_TENANT_TABLES_REQUIRED'):
+            PostgresStore(runtime)
+    finally:
+        with psycopg.connect(owner) as migration:
+            migration.execute('ALTER TABLE fw_memberships_drift_probe RENAME TO memberships')
     store=PostgresStore(runtime)
     assert store.member_role(TENANT, USER) == 'editor'
     # Verify an actual status change revokes authorization immediately.
