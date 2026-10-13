@@ -81,3 +81,7 @@ See [runtime identity, private telemetry and production acceptance](ops/runbooks
 - **Five ForgeWorks products, one future application/domain:** [architecture](docs/platform/ONE_APP_FIVE_SERVICES.md). SealAngel Work is a separate planned repository/application/domain; neither domain name is configured by this documentation.
 - **Actual implemented and verified behavior:** keep using [current scoped evidence](docs/verification/CURRENT_GATE_EVIDENCE.md) and the [hosted runbook](ops/runbooks/RUNTIME_RELEASE_VERIFICATION.md). Local tests, staging claims and production acceptance are different gates.
 - The 2026-10-09 G2 bootstrap record remains historical and must not be mistaken for today's repository status.
+
+## Complete owner document package
+
+[Full specifications and IR catalogue](docs/specifications/source/README.md) from the owner upload are included in this repository. Use the source files for full design detail and the adjacent product specification for the engineering summary. File hashes are recorded in the source index.

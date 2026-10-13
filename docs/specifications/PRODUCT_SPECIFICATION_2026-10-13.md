@@ -39,3 +39,7 @@ For each topic, bind the implemented source file, requirement ID, positive/negat
 The latest repository source and actual hosted runtime take precedence over an older blueprint's claim of implementation. Explicitly verify real identity and authorization, RLS/tenant isolation, bounded provider permissions, reconciliation, audit, backup/restore and domain-review acceptance before marking RELEASED. Current gate remains open until source-SHA-bound evidence is accepted.
 
 See [shared-app boundary](../platform/ONE_APP_FIVE_SERVICES.md), [current gate evidence](../verification/CURRENT_GATE_EVIDENCE.md) and [hosted runbook](../../ops/runbooks/RUNTIME_RELEASE_VERIFICATION.md).
+
+## Complete uploaded source
+
+Read [the complete owner documents and IR catalogue](source/README.md). These files are preserved byte-for-byte; this page is a summary. The source index records each file size and Git blob SHA.
