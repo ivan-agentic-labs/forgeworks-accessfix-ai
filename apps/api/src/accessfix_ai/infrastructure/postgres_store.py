@@ -144,7 +144,7 @@ class PostgresStore(Store):
             return db.execute("SELECT 1 FROM memberships WHERE tenant_id=? AND user_id=? AND status='ACTIVE'", (tenant, user)).fetchone() is not None
 
     @contextmanager
-    def conn(self, tenant=None):
+    def conn(self, tenant=None, *, repeatable_read=False):
         tenant = tenant or TENANT_CONTEXT.get()
         if tenant is None:
             raise ValueError("A transaction requires an explicit tenant context")
@@ -153,9 +153,13 @@ class PostgresStore(Store):
         if active:
             if active[0] != id(self) or active[1] != tenant:
                 raise ValueError("Nested transaction cannot change store or tenant")
+            if repeatable_read:
+                raise ValueError("A repeatable-read snapshot requires an owning transaction")
             yield active[2]
             return
         with psycopg.connect(self.dsn, row_factory=dict_row, connect_timeout=5) as db:
+            if repeatable_read:
+                db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
             db.execute("SET LOCAL ROLE fw_accessfix_ai_rw")
             db.execute("SELECT set_config('app.tenant_id', %s, true)", (tenant,))
             # Conservative serialization for this low-volume adapter. No pooling.

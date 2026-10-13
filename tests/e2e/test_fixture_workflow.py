@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 import time
 
 import jwt
@@ -140,6 +142,29 @@ def test_fixture_workflow_ownership_job_findings_proposal_retest_review(tmp_path
         assert stale_review.status_code == 409
         assert stale_review.json()["code"] == "STALE_VERSION"
 
+        exported = client.get(f"/v1/scans/{accepted.json()['id']}/evidence-export", headers=auth)
+        assert exported.status_code == 200
+        assert exported.headers["content-disposition"].startswith("attachment; filename=\"accessfix-evidence-")
+        assert exported.headers["cache-control"] == "no-store"
+        evidence = exported.json()
+        bundle_sha = evidence.pop("bundle_sha256")
+        canonical = json.dumps(evidence, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        assert bundle_sha == hashlib.sha256(canonical).hexdigest()
+        assert evidence["scope"] == "SYNTHETIC_LOCAL_FIXTURE_ONLY"
+        assert evidence["source"]["content_included"] is False
+        assert evidence["source"]["revision_verified"] is False
+        assert evidence["coverage"]["browser_rendered"] is False
+        assert evidence["coverage"]["wcag_conformance_claim"] is False
+        assert evidence["findings"][0]["fingerprint"] == items[0]["fingerprint"]
+        assert evidence["proposals"][0]["patch_sha256"] == proposal_body["patch_sha256"]
+        assert evidence["proposals"][0]["retest_status"] == "PASSED"
+        assert evidence["proposals"][0]["content_integrity_verified"] is True
+        assert "alt_text_sha256" not in evidence["proposals"][0]
+        assert evidence["proposals"][0]["reviews"][0]["actor_id"] == USER
+        assert evidence["proposals"][0]["reviews"][0]["decision"] == "approve"
+        assert "source_html" not in exported.text and "patch_text" not in exported.text
+        assert "Synthetic fixture illustration" not in exported.text
+
 
 def test_remote_origin_is_visible_and_fail_closed_without_queueing(tmp_path):
     auth = headers("site:verify scan:start")
@@ -165,4 +190,3 @@ def test_remote_origin_is_visible_and_fail_closed_without_queueing(tmp_path):
         assert blocked.json()["code"] == "REMOTE_BROWSER_BLOCKED"
         with client.app.state.store.conn() as connection:
             assert connection.execute("SELECT COUNT(*) FROM scans").fetchone()[0] == 0
-

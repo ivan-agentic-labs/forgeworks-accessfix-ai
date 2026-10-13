@@ -72,6 +72,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/scans/{scan_id}/evidence-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export redacted evidence manifest for a local synthetic scan
+         * @description Development/test only. Returns integrity digests and workflow evidence; raw HTML and patch content are omitted. Not a signed artifact or WCAG conformance claim.
+         */
+        get: operations["get_v1_scans_scan_id_evidence_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/findings/{finding_id}/fix-proposals": {
         parameters: {
             query?: never;
@@ -280,6 +300,90 @@ export interface components {
             evidence: components["schemas"]["FindingEvidence"];
             source_mapping: components["schemas"]["SourceMapping"];
         };
+        EvidenceExport: {
+            /** @constant */
+            schema_version: "forgeworks.accessfix.evidence/v1";
+            /** @constant */
+            product: "accessfix-ai";
+            /** @constant */
+            scope: "SYNTHETIC_LOCAL_FIXTURE_ONLY";
+            /** Format: date-time */
+            exported_at: string;
+            scan: {
+                /** Format: uuid */
+                id: string;
+                /** @constant */
+                status: "SUCCEEDED";
+                /** Format: uuid */
+                site_id: string;
+                repo_commit_sha: string;
+                /** @constant */
+                revision_verified: false;
+                network_policy_sha256: string;
+                /** Format: date-time */
+                created_at: string;
+                attempt_count: number;
+            };
+            source: {
+                /** @constant */
+                kind: "LOCAL_FIXTURE";
+                digest_sha256: string;
+                byte_length: number;
+                /** @constant */
+                content_included: false;
+                /** @constant */
+                revision_verified: false;
+            };
+            coverage: {
+                /** @constant */
+                scan_mode: "STATIC_LOCAL_HTML_FIXTURE";
+                /** @constant */
+                paths: [
+                    "/"
+                ];
+                /** @constant */
+                pages_evaluated: 1;
+                /** @constant */
+                rule_ids_evaluated: [
+                    "image-alt"
+                ];
+                /** @constant */
+                browser_rendered: false;
+                /** @constant */
+                wcag_conformance_claim: false;
+            };
+            findings: components["schemas"]["AccessibilityFinding"][];
+            proposals: components["schemas"]["EvidenceProposal"][];
+            limitations: ("SOURCE_REVISION_NOT_VERIFIED" | "RAW_SOURCE_AND_PATCH_CONTENT_OMITTED" | "NOT_SIGNED_OR_IMMUTABLE" | "NOT_A_WCAG_CONFORMANCE_CLAIM")[];
+            /** @description SHA-256 of minified UTF-8 JSON with this property omitted; recursively sort object keys in ascending Unicode code-point order, retain array order, encode non-ASCII characters as UTF-8, use JSON string escapes, allow only string/integer/boolean/null/container values (no floats), and add no trailing newline. Integrity check only, not a signature. */
+            bundle_sha256: string;
+        };
+        EvidenceProposal: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            finding_id: string;
+            base_sha: string;
+            patch_sha256: string;
+            source_sha256: string;
+            patched_source_sha256: string;
+            /** @constant */
+            content_integrity_verified: true;
+            status: string;
+            retest_status: string;
+            version: number;
+            reviews: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                actor_id: string;
+                /** @enum {string} */
+                decision: "approve" | "reject";
+                /** @enum {string} */
+                manual_check_status: "passed" | "failed" | "not_applicable";
+                proposal_version: number;
+            }[];
+        };
         FixProposal: {
             /** Format: uuid */
             id: string;
@@ -290,6 +394,8 @@ export interface components {
             finding_id: string;
             base_sha: string;
             patch_sha256: string;
+            /** @description Actual unified diff against the stored local source snapshot. */
+            patch: string;
             retest_status: string;
             /** @description Current stored proposal version required as expected_version on review. */
             version: number;
@@ -335,6 +441,8 @@ export interface components {
         CreateFixRequest: {
             /** Format: uuid */
             source_mapping_id: string;
+            /** @description Owner-authored alternative text; semantic quality requires human review. */
+            alt_text: string;
         };
         ReviewFixRequest: {
             patch_sha256: string;
@@ -375,7 +483,12 @@ export interface components {
         SourceMapping: {
             /** Format: uuid */
             id: string;
+            /** @description Finding is mapped to a unique local source image; does not verify a Git revision. */
             verified: boolean;
+            /** @constant */
+            revision_verified: false;
+            /** @constant */
+            source_kind: "LOCAL_FIXTURE";
             source_revision: string;
         };
         PublishFixRequest: {
@@ -867,6 +980,84 @@ export interface operations {
                 };
             };
             /** @description Dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_v1_scans_scan_id_evidence_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redacted evidence JSON attachment */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceExport"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Scan not found or not visible to this tenant */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Scan incomplete or stored source, findings, proposal evidence, or manifest schema failed validation */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid scan identifier */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Export disabled outside local synthetic development/test scope */
             503: {
                 headers: {
                     [name: string]: unknown;

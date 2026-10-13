@@ -153,8 +153,13 @@ def test_postgres_scan_worker_retest_review_and_tenant_boundary(monkeypatch):
     from accessfix_ai.main import create_app
     from test_accessfix_flow import hdr
     monkeypatch.setenv('ACCESSFIX_DATABASE_URL',runtime)
+    monkeypatch.setenv('APP_ENV','test')
     with TestClient(create_app()) as client:
         findings=client.get(f'/v1/scans/{scan_id}/findings',headers=hdr('scan:read'))
         assert findings.status_code==200 and findings.json()['items'][0]['rule_id']=='image-alt'
+        exported=client.get(f'/v1/scans/{scan_id}/evidence-export',headers=hdr('scan:read'))
+        assert exported.status_code==200
+        assert exported.headers['content-type'].startswith('application/json')
+        assert len(exported.json()['bundle_sha256'])==64
         job=client.get(f"/v1/jobs/{store.get_scan(TENANT,scan_id)['job_id']}",headers=hdr('job:read'))
         assert job.status_code==200 and job.json()['state']=='SUCCEEDED'

@@ -47,10 +47,12 @@ class Store:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.init()
 
-    def conn(self, tenant=None) -> sqlite3.Connection:
+    def conn(self, tenant=None, *, repeatable_read=False) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, uri=self._uri, check_same_thread=False, timeout=5)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA busy_timeout=5000")
+        if repeatable_read:
+            connection.execute("BEGIN")
         return connection
 
     def init(self) -> None:
@@ -248,6 +250,191 @@ class Store:
     def scan_source(self, tenant: str, scan_id: str):
         with self.conn() as c:
             return c.execute("SELECT * FROM scan_sources WHERE tenant_id=? AND scan_id=?", (tenant, scan_id)).fetchone()
+
+    def scan_findings_snapshot(self, tenant: str, scan_id: str):
+        """Read scan state, findings, and source from one tenant-scoped SQL snapshot."""
+        with self.conn(tenant) as c:
+            rows = c.execute(
+                "SELECT s.id AS snapshot_scan_id,s.status AS snapshot_scan_status,"
+                "s.site_id AS snapshot_site_id,s.commit_sha AS snapshot_commit_sha,"
+                "s.policy_sha AS snapshot_policy_sha,s.created_at AS snapshot_created_at,"
+                "s.attempt_count AS snapshot_attempt_count,"
+                "f.id AS snapshot_finding_id,f.scan_id AS snapshot_finding_scan_id,"
+                "f.rule_id AS snapshot_finding_rule_id,f.severity AS snapshot_finding_severity,"
+                "f.selector AS snapshot_finding_selector,f.fingerprint AS snapshot_finding_fingerprint,"
+                "f.manual_required AS snapshot_finding_manual_required,"
+                "ss.source_sha AS snapshot_source_sha,ss.source_html AS snapshot_source_html "
+                "FROM scans s "
+                "LEFT JOIN findings f ON f.tenant_id=s.tenant_id AND f.scan_id=s.id "
+                "LEFT JOIN scan_sources ss ON ss.tenant_id=s.tenant_id AND ss.scan_id=s.id "
+                "WHERE s.tenant_id=? AND s.id=? ORDER BY f.id",
+                (tenant, scan_id),
+            ).fetchall()
+        if not rows:
+            return None
+        first = dict(rows[0])
+        scan = {
+            "id": first["snapshot_scan_id"],
+            "status": first["snapshot_scan_status"],
+            "site_id": first["snapshot_site_id"],
+            "commit_sha": first["snapshot_commit_sha"],
+            "policy_sha": first["snapshot_policy_sha"],
+            "created_at": first["snapshot_created_at"],
+            "attempt_count": first["snapshot_attempt_count"],
+        }
+        findings = [{
+            "id": row["snapshot_finding_id"],
+            "scan_id": row["snapshot_finding_scan_id"],
+            "rule_id": row["snapshot_finding_rule_id"],
+            "severity": row["snapshot_finding_severity"],
+            "selector": row["snapshot_finding_selector"],
+            "fingerprint": row["snapshot_finding_fingerprint"],
+            "manual_required": row["snapshot_finding_manual_required"],
+        } for row in map(dict, rows) if row["snapshot_finding_id"] is not None]
+        source = None
+        if first["snapshot_source_sha"] is not None or first["snapshot_source_html"] is not None:
+            source = {
+                "source_sha": first["snapshot_source_sha"],
+                "source_html": first["snapshot_source_html"],
+            }
+        return {"scan": scan, "findings": findings, "source": source}
+
+    def scan_evidence_export(self, tenant: str, scan_id: str):
+        """Read a tenant-bound, content-redacted evidence snapshot for export."""
+        with self.lock, self.conn(tenant, repeatable_read=True) as c:
+            scan_row = c.execute(
+                "SELECT id,site_id,commit_sha,policy_sha,status,created_at,attempt_count "
+                "FROM scans WHERE tenant_id=? AND id=?",
+                (tenant, scan_id),
+            ).fetchone()
+            if not scan_row:
+                return None
+            scan = dict(scan_row)
+            site_row = c.execute(
+                "SELECT origin FROM sites WHERE tenant_id=? AND id=?",
+                (tenant, scan["site_id"]),
+            ).fetchone()
+            source_row = c.execute(
+                "SELECT source_sha,source_html FROM scan_sources WHERE tenant_id=? AND scan_id=?",
+                (tenant, scan_id),
+            ).fetchone()
+            source = dict(source_row) if source_row else None
+            source_bytes = source["source_html"].encode("utf-8") if source and isinstance(source.get("source_html"), str) else b""
+            source_integrity_verified = bool(
+                source and hashlib.sha256(source_bytes).hexdigest() == source["source_sha"]
+            )
+            findings = [dict(row) for row in c.execute(
+                "SELECT * FROM findings WHERE tenant_id=? AND scan_id=? ORDER BY id",
+                (tenant, scan_id),
+            ).fetchall()]
+            proposal_rows = c.execute(
+                "SELECT p.*,f.selector AS finding_selector,f.rule_id AS finding_rule_id,"
+                "f.fingerprint AS finding_fingerprint,s.source_sha AS proposal_source_sha,"
+                "s.patched_sha AS proposal_patched_sha FROM proposals p "
+                "INNER JOIN findings f ON f.tenant_id=p.tenant_id AND f.id=p.finding_id "
+                "LEFT JOIN proposal_sources s ON s.tenant_id=p.tenant_id AND s.proposal_id=p.id "
+                "WHERE p.tenant_id=? AND f.scan_id=? ORDER BY p.id",
+                (tenant, scan_id),
+            ).fetchall()
+            proposals = []
+            for proposal_row in proposal_rows:
+                proposal = dict(proposal_row)
+                review_rows = c.execute(
+                    "SELECT id,reviewer_id,decision,manual_status,version FROM reviews "
+                    "WHERE tenant_id=? AND proposal_id=? ORDER BY version,id",
+                    (tenant, proposal["id"]),
+                ).fetchall()
+                content_row = c.execute(
+                    "SELECT source_sha,patched_sha,patch_text,patched_html,alt_text "
+                    "FROM proposal_sources WHERE tenant_id=? AND proposal_id=?",
+                    (tenant, proposal["id"]),
+                ).fetchone()
+                content = dict(content_row) if content_row else None
+                proposal_integrity_verified = False
+                if content and source_integrity_verified and proposal["finding_selector"].startswith("img#"):
+                    try:
+                        rebuilt = build_image_alt_patch(
+                            source_bytes, proposal["finding_selector"][4:], content["alt_text"]
+                        )
+                        proposal_integrity_verified = bool(
+                            content["source_sha"] == source["source_sha"] == proposal["proposal_source_sha"]
+                            and content["patched_sha"] == proposal["proposal_patched_sha"] == rebuilt["patched_sha256"]
+                            and content["patch_text"] == rebuilt["patch"]
+                            and content["patched_html"] == rebuilt["patched_source"].decode("utf-8")
+                            and rebuilt["patch_sha256"] == proposal["patch_sha"]
+                        )
+                    except (ValueError, TypeError, UnicodeError, AttributeError):
+                        proposal_integrity_verified = False
+                proposals.append({
+                    "id": proposal["id"],
+                    "finding_id": proposal["finding_id"],
+                    "base_sha": proposal["base_sha"],
+                    "patch_sha256": proposal["patch_sha"],
+                    "source_sha256": proposal["proposal_source_sha"],
+                    "patched_source_sha256": proposal["proposal_patched_sha"],
+                    "content_integrity_verified": proposal_integrity_verified,
+                    "status": proposal["status"],
+                    "retest_status": proposal["retest_status"],
+                    "version": proposal["version"],
+                    "reviews": [{
+                        "id": review["id"],
+                        "actor_id": review["reviewer_id"],
+                        "decision": review["decision"],
+                        "manual_check_status": review["manual_status"],
+                        "proposal_version": review["version"],
+                    } for review in review_rows],
+                })
+
+            actual_findings = {}
+            actual_finding_rows = []
+            if source_integrity_verified:
+                try:
+                    actual_finding_rows = image_alt_findings(source_bytes)
+                    actual_findings = {item["fingerprint"]: item for item in actual_finding_rows}
+                except (ValueError, TypeError, UnicodeError):
+                    source_integrity_verified = False
+            stored_fingerprints = [finding["fingerprint"] for finding in findings]
+            findings_set_integrity_verified = bool(
+                source_integrity_verified
+                and len(actual_findings) == len(actual_finding_rows) == len(findings)
+                and len(set(stored_fingerprints)) == len(findings)
+                and set(stored_fingerprints) == set(actual_findings)
+            )
+            evidence_findings = []
+            for finding in findings:
+                actual = actual_findings.get(finding["fingerprint"])
+                manual_required_raw = finding["manual_required"]
+                manual_required_valid = type(manual_required_raw) is int and manual_required_raw in {0, 1}
+                finding_integrity_verified = bool(
+                    actual
+                    and manual_required_valid
+                    and finding["selector"] == actual["selector"]
+                    and finding["rule_id"] == actual["rule_id"]
+                    and finding["severity"] == actual["severity"]
+                    and manual_required_raw == actual["manual_required"]
+                )
+                evidence_findings.append({
+                    "id": finding["id"],
+                    "scan_id": finding["scan_id"],
+                    "rule_id": finding["rule_id"],
+                    "severity": finding["severity"],
+                    "selector": finding["selector"],
+                    "fingerprint": finding["fingerprint"],
+                    "manual_check_required": bool(finding["manual_required"]),
+                    "evidence_sha256": actual["evidence_sha256"] if finding_integrity_verified else None,
+                    "finding_integrity_verified": finding_integrity_verified,
+                    "source_mapping_verified": finding_integrity_verified,
+                })
+            return {
+                "scan": scan,
+                "origin": dict(site_row)["origin"] if site_row else None,
+                "source_sha256": source["source_sha"] if source else None,
+                "source_byte_length": len(source_bytes) if source else None,
+                "source_integrity_verified": source_integrity_verified,
+                "findings_set_integrity_verified": findings_set_integrity_verified,
+                "findings": evidence_findings,
+                "proposals": proposals,
+            }
 
     def fail_scan(self, tenant: str, scan_id: str, error_code: str, *, max_attempts: int = 3, lease_until: str | None = None) -> str:
         with self.lock, self.conn() as c:

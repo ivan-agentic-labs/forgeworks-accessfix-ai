@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import os
 import secrets
 import threading
@@ -16,6 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
+from accessfix_ai.domain.evidence_manifest import validate_evidence_export
 from accessfix_ai.domain.static_html import image_alt_findings
 
 from accessfix_ai.domain.target_policy import (
@@ -89,11 +91,36 @@ def problem(status: int, code: str, detail: str) -> JSONResponse:
             "detail": detail,
             "request_id": "runtime",
         },
+        media_type="application/problem+json",
     )
 
 
 def _timestamp(value: datetime | None = None) -> str:
     return (value or datetime.now(timezone.utc)).isoformat().replace("+00:00", "Z")
+
+
+def _local_fixture_evidence_export_enabled() -> bool:
+    return os.getenv("APP_ENV", "") in {"development", "test"}
+
+
+def _validate_evidence_value(value) -> None:
+    if value is None or type(value) in {str, int, bool}:
+        return
+    if type(value) is list:
+        for item in value:
+            _validate_evidence_value(item)
+        return
+    if type(value) is dict and all(type(key) is str for key in value):
+        for item in value.values():
+            _validate_evidence_value(item)
+        return
+    raise TypeError("Evidence JSON allows only strings, integers, booleans, null, arrays, and objects")
+
+
+def _canonical_evidence_bytes(payload: dict) -> bytes:
+    """Minified UTF-8 JSON: sorted object keys, array order retained, no floats or trailing newline."""
+    _validate_evidence_value(payload)
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
 
 
 def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
@@ -151,7 +178,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             "type": "about:blank", "title": "Request rejected", "status": 422,
             "code": "INVALID_REQUEST", "detail": "Request does not match the input contract",
             "request_id": "runtime",
-        })
+        }, media_type="application/problem+json")
 
     @app.exception_handler(HTTPException)
     async def http_error(_, exc: HTTPException):
@@ -163,7 +190,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             "detail": str(exc.detail),
             "request_id": "runtime",
         }
-        return JSONResponse(status_code=exc.status_code, content=detail)
+        return JSONResponse(status_code=exc.status_code, content=detail, media_type="application/problem+json")
 
     @app.get("/v1/auth/config")
     def auth_config():
@@ -289,20 +316,47 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
     @app.get("/v1/scans/{scan_id}/findings")
     def findings(scan_id: UUID, c=Depends(scope("scan:read", store))):
-        scan = store.get_scan(c["tenant_id"], str(scan_id))
-        if not scan:
+        snapshot = store.scan_findings_snapshot(c["tenant_id"], str(scan_id))
+        if not snapshot:
             return problem(404, "RESOURCE_NOT_FOUND", "Scan is not visible")
+        scan = snapshot["scan"]
         items = []
-        # Findings and their immutable source are committed together. Read the
-        # findings first so a worker committing between reads cannot expose a
-        # finding paired with an earlier, missing source snapshot.
-        visible_findings = store.findings(c["tenant_id"], str(scan_id))
-        snapshot = store.scan_source(c["tenant_id"], str(scan_id))
+        # One SQL statement provides one consistent tenant-scoped snapshot of
+        # scan state, findings, and immutable source across SQLite/PostgreSQL.
+        visible_findings = snapshot["findings"]
+        source_snapshot = snapshot["source"]
         actual = {}
-        if snapshot and hashlib.sha256(snapshot["source_html"].encode()).hexdigest() == snapshot["source_sha"]:
-            actual = {item["fingerprint"]: item for item in image_alt_findings(snapshot["source_html"].encode())}
+        if scan["status"] == "SUCCEEDED":
+            source_html = source_snapshot.get("source_html") if source_snapshot else None
+            if not isinstance(source_html, str) or hashlib.sha256(source_html.encode()).hexdigest() != source_snapshot["source_sha"]:
+                return problem(409, "SOURCE_INTEGRITY_FAILED", "Stored source evidence failed its digest check")
+            try:
+                actual_rows = image_alt_findings(source_html.encode())
+            except (ValueError, TypeError, UnicodeError):
+                return problem(409, "SOURCE_INTEGRITY_FAILED", "Stored source is not accepted by the scanner")
+            actual = {item["fingerprint"]: item for item in actual_rows}
+            stored_fingerprints = [finding["fingerprint"] for finding in visible_findings]
+            if (
+                len(actual) != len(actual_rows)
+                or len(actual_rows) != len(visible_findings)
+                or len(set(stored_fingerprints)) != len(visible_findings)
+                or set(stored_fingerprints) != set(actual)
+            ):
+                return problem(409, "SOURCE_INTEGRITY_FAILED", "Stored findings differ from the source scan")
         for finding in visible_findings:
             matched = actual.get(finding["fingerprint"])
+            manual_required_raw = finding["manual_required"]
+            manual_required_valid = type(manual_required_raw) is int and manual_required_raw in {0, 1}
+            mapping_verified = bool(
+                matched
+                and manual_required_valid
+                and matched["selector"] == finding["selector"]
+                and matched["rule_id"] == finding["rule_id"]
+                and matched["severity"] == finding["severity"]
+                and matched["manual_required"] == manual_required_raw
+            )
+            if not mapping_verified:
+                return problem(409, "SOURCE_INTEGRITY_FAILED", "Stored finding differs from the source scan")
             items.append(
                 {
                     "id": finding["id"],
@@ -311,14 +365,14 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
                     "severity": finding["severity"],
                     "selector": finding["selector"],
                     "fingerprint": finding["fingerprint"],
-                    "manual_check_required": bool(finding["manual_required"]),
+                    "manual_check_required": manual_required_raw == 1,
                     "evidence": {
                         "kind": "DOM_SNIPPET",
-                        "digest_sha256": matched["evidence_sha256"] if matched else finding["fingerprint"],
+                        "digest_sha256": matched["evidence_sha256"],
                     },
                     "source_mapping": {
                         "id": finding["id"],
-                        "verified": bool(matched and finding["selector"].startswith("img#")),
+                        "verified": mapping_verified,
                         "source_revision": scan["commit_sha"],
                         "revision_verified": False,
                         "source_kind": "LOCAL_FIXTURE",
@@ -326,6 +380,98 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
                 }
             )
         return {"items": items, "next_cursor": None, "has_more": False}
+
+    @app.get("/v1/scans/{scan_id}/evidence-export")
+    def export_scan_evidence(scan_id: UUID, c=Depends(scope("scan:read", store))):
+        if not _local_fixture_evidence_export_enabled():
+            return problem(503, "EVIDENCE_EXPORT_DISABLED", "Evidence export is limited to local synthetic fixtures until retention and privacy controls are approved")
+        snapshot = store.scan_evidence_export(c["tenant_id"], str(scan_id))
+        if not snapshot:
+            return problem(404, "RESOURCE_NOT_FOUND", "Scan is not visible")
+        if snapshot["scan"]["status"] != "SUCCEEDED":
+            return problem(409, "EVIDENCE_NOT_READY", "Only completed scans can be exported")
+        if snapshot["origin"] != "http://fixture.local":
+            return problem(503, "EVIDENCE_EXPORT_DISABLED", "Only the local synthetic fixture is supported")
+        if not snapshot["source_integrity_verified"]:
+            return problem(409, "SOURCE_INTEGRITY_FAILED", "Stored source evidence failed its digest check")
+        if not snapshot["findings_set_integrity_verified"]:
+            return problem(409, "SOURCE_INTEGRITY_FAILED", "Stored findings differ from the source scan")
+        if any(not finding["finding_integrity_verified"] for finding in snapshot["findings"]):
+            return problem(409, "SOURCE_INTEGRITY_FAILED", "Stored finding differs from the source scan")
+        if any(not proposal["content_integrity_verified"] for proposal in snapshot["proposals"]):
+            return problem(409, "SOURCE_INTEGRITY_FAILED", "Stored proposal evidence failed its integrity check")
+
+        findings_export = [{
+            "id": finding["id"],
+            "scan_id": finding["scan_id"],
+            "rule_id": finding["rule_id"],
+            "severity": finding["severity"],
+            "selector": finding["selector"],
+            "fingerprint": finding["fingerprint"],
+            "manual_check_required": finding["manual_check_required"],
+            "evidence": {"kind": "DOM_SNIPPET", "digest_sha256": finding["evidence_sha256"]},
+            "source_mapping": {
+                "id": finding["id"],
+                "verified": finding["source_mapping_verified"],
+                "source_revision": snapshot["scan"]["commit_sha"],
+                "revision_verified": False,
+                "source_kind": "LOCAL_FIXTURE",
+            },
+        } for finding in snapshot["findings"]]
+        payload = {
+            "schema_version": "forgeworks.accessfix.evidence/v1",
+            "product": "accessfix-ai",
+            "scope": "SYNTHETIC_LOCAL_FIXTURE_ONLY",
+            "exported_at": _timestamp(),
+            "scan": {
+                "id": snapshot["scan"]["id"],
+                "status": snapshot["scan"]["status"],
+                "site_id": snapshot["scan"]["site_id"],
+                "repo_commit_sha": snapshot["scan"]["commit_sha"],
+                "revision_verified": False,
+                "network_policy_sha256": snapshot["scan"]["policy_sha"],
+                "created_at": snapshot["scan"]["created_at"],
+                "attempt_count": snapshot["scan"]["attempt_count"],
+            },
+            "source": {
+                "kind": "LOCAL_FIXTURE",
+                "digest_sha256": snapshot["source_sha256"],
+                "byte_length": snapshot["source_byte_length"],
+                "content_included": False,
+                "revision_verified": False,
+            },
+            "coverage": {
+                "scan_mode": "STATIC_LOCAL_HTML_FIXTURE",
+                "paths": ["/"],
+                "pages_evaluated": 1,
+                "rule_ids_evaluated": ["image-alt"],
+                "browser_rendered": False,
+                "wcag_conformance_claim": False,
+            },
+            "findings": findings_export,
+            "proposals": snapshot["proposals"],
+            "limitations": [
+                "SOURCE_REVISION_NOT_VERIFIED",
+                "RAW_SOURCE_AND_PATCH_CONTENT_OMITTED",
+                "NOT_SIGNED_OR_IMMUTABLE",
+                "NOT_A_WCAG_CONFORMANCE_CLAIM",
+            ],
+        }
+        try:
+            canonical = _canonical_evidence_bytes(payload)
+            payload["bundle_sha256"] = hashlib.sha256(canonical).hexdigest()
+            validate_evidence_export(payload)
+            body = _canonical_evidence_bytes(payload).decode("utf-8")
+        except (TypeError, ValueError, UnicodeError):
+            return problem(409, "EVIDENCE_SCHEMA_INVALID", "Stored evidence contains unsupported values")
+        return Response(
+            content=body,
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f'attachment; filename="accessfix-evidence-{scan_id}.json"',
+                "Cache-Control": "no-store",
+            },
+        )
 
     @app.post("/v1/findings/{finding_id}/fix-proposals", status_code=201)
     def fix(finding_id: UUID, body: CreateFix, idempotency_key: Annotated[str | None, Header()] = None, c=Depends(scope("patch:create", store))):
@@ -441,4 +587,3 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
 
 app = create_app(seed=os.getenv("ACCESSFIX_SEED_FIXTURE", "0") == "1")
-

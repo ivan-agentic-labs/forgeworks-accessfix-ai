@@ -16,6 +16,8 @@ Website accessibility auditing and evidence-backed remediation. It remains a sep
 6. Bind approval to exact patch digest and ownership; create draft PR only; never auto-merge.
 7. Revocation aborts the workflow safely; export source/scan/coverage/retest/approval evidence.
 
+The current implementation candidate adds a **local fixture-only evidence manifest** for this export step. It is not a signed audit artifact, does not include raw source or patch bytes, and does not satisfy production/privacy/retention or independent accessibility acceptance. See the dated [evidence-export change advisory](../architecture/EVIDENCE_EXPORT_CHANGE_ADVISORY_2026-10-13.md); the remaining limits and release gates in this specification still apply.
+
 ## Limits and non-goals
 Owner-designed challenge: DNS TXT up to three retries at 30-second intervals, max five minutes; well-known file up to two retries. Two concurrent scans per workspace by default. Evidence retention proposed two years (must pass privacy review). Automated checks cannot certify full WCAG compliance.
 
