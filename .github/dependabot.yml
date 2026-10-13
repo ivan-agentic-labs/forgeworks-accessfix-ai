@@ -1,5 +1,5 @@
-# Automated security and compatibility updates are proposed as PRs only.
-# All dependency changes must pass the repository's normal CI and human review.
+# Group routine dependency updates to keep the review queue small.
+# CI and compatibility review remain mandatory before merging.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
@@ -9,7 +9,11 @@ updates:
       day: "monday"
       time: "03:00"
       timezone: "Asia/Jakarta"
-    open-pull-requests-limit: 4
+    open-pull-requests-limit: 1
+    groups:
+      routine-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "pip"
     directory: "/apps/api"
     schedule:
@@ -17,7 +21,11 @@ updates:
       day: "monday"
       time: "03:00"
       timezone: "Asia/Jakarta"
-    open-pull-requests-limit: 4
+    open-pull-requests-limit: 1
+    groups:
+      routine-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "npm"
     directory: "/packages/sdk"
     schedule:
@@ -25,4 +33,12 @@ updates:
       day: "monday"
       time: "03:00"
       timezone: "Asia/Jakarta"
-    open-pull-requests-limit: 4
+    open-pull-requests-limit: 1
+    groups:
+      routine-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    # TypeScript 7 fails SDK peer resolution; caller analysis needs the TS 5 API.
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
