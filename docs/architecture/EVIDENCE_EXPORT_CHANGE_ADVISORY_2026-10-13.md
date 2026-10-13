@@ -25,7 +25,7 @@ This is a convenience evidence manifest, **not signed, immutable, timestamp-comp
 
 - Final full local Python suite: **385 passed, 9 skipped**. Eight skips are opt-in/disposable Chromium proofs; one is PostgreSQL unavailable. None is reported as a browser or PostgreSQL runtime pass.
 - Focused export/permission tests are included in the full-suite receipt, including canonical digest, strict OpenAPI-compatible payload validation (UUIDs, integer bounds and timestamps), exact boolean/integer const typing, content omission, explicit tenant connection, complete finding-set enforcement, single-statement listing snapshot, repeatable-read export transaction, concurrent SQLite snapshot proof, tenant isolation, insufficient scope, tampered source/patch/alt text/finding metadata, scanner rejection, 422/HTTP exception problem media type, disabled-route media type, missing environment, null alt text, and float rejection.
-- The disposable PostgreSQL runtime test now exercises both findings listing and evidence export under the adapter's repeatable-read transaction, but its execution is pending GitHub CI; it is not claimed as a local pass.
+- On implementation commit `4e94fa133daced5ffbc50fc45be54be3eda9d7d4`, all four GitHub PR checks passed. The PostgreSQL runtime job executed the disposable runtime test and reported **1 passed in 1.10s**; it was not skipped. This is CI evidence, not a local PostgreSQL pass.
 - `python scripts/verify_bootstrap.py`: **PASS**, 195 files scanned, no findings.
 - `python scripts/verify_contracts.py`: **PASS**, 14 operations, no errors.
 - `python scripts/validate_openapi_independent.py`: **PASS**.
@@ -33,4 +33,4 @@ This is a convenience evidence manifest, **not signed, immutable, timestamp-comp
 - `node --check apps/web/app.js` and browser-session tests: **PASS**, 3 tests.
 - `git diff --check`: **PASS**.
 
-PostgreSQL runtime, hosted services, and independent domain/privacy approval are separate evidence and are not inferred here. CI results for the exact PR commit will supersede this local receipt only for their explicitly tested scope.
+Hosted services and independent domain/privacy approval remain separate gates and are not inferred here. The cited CI receipt applies only to the runtime and contract scope exercised on the implementation commit; it does not constitute G1-E, production, privacy, or domain approval.
