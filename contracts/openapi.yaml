@@ -346,6 +346,75 @@ paths:
           minimum: 1
           maximum: 100
           default: 50
+  /v1/scans/{scan_id}/evidence-export:
+    get:
+      operationId: get_v1_scans_scan_id_evidence_export
+      summary: Export redacted evidence manifest for a local synthetic scan
+      description: Development/test only. Returns integrity digests and workflow evidence; raw HTML and patch content are omitted. Not a signed artifact or WCAG conformance claim.
+      security:
+      - BearerAuth: []
+      tags:
+      - AccessFix AI
+      x-required-scope: scan:read
+      x-idempotent-command: false
+      responses:
+        '200':
+          description: Redacted evidence JSON attachment
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceExport'
+        '401':
+          description: Unauthenticated
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Scan not found or not visible to this tenant
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: Scan incomplete or stored source, findings, proposal evidence, or manifest schema failed validation
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: Invalid scan identifier
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Export disabled outside local synthetic development/test scope
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: scan_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
   /v1/findings/{finding_id}/fix-proposals:
     post:
       operationId: post_v1_findings_finding_id_fix_proposals
@@ -1233,6 +1302,119 @@ components:
           $ref: '#/components/schemas/FindingEvidence'
         source_mapping:
           $ref: '#/components/schemas/SourceMapping'
+    EvidenceExport:
+      type: object
+      additionalProperties: false
+      required:
+      - schema_version
+      - product
+      - scope
+      - exported_at
+      - scan
+      - source
+      - coverage
+      - findings
+      - proposals
+      - limitations
+      - bundle_sha256
+      properties:
+        schema_version:
+          type: string
+          const: forgeworks.accessfix.evidence/v1
+        product:
+          type: string
+          const: accessfix-ai
+        scope:
+          type: string
+          const: SYNTHETIC_LOCAL_FIXTURE_ONLY
+        exported_at:
+          type: string
+          format: date-time
+        scan:
+          type: object
+          additionalProperties: false
+          required: [id, status, site_id, repo_commit_sha, revision_verified, network_policy_sha256, created_at, attempt_count]
+          properties:
+            id: {type: string, format: uuid}
+            status: {type: string, const: SUCCEEDED}
+            site_id: {type: string, format: uuid}
+            repo_commit_sha: {type: string, pattern: '^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$'}
+            revision_verified: {type: boolean, const: false}
+            network_policy_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+            created_at: {type: string, format: date-time}
+            attempt_count: {type: integer, minimum: 1}
+        source:
+          type: object
+          additionalProperties: false
+          required: [kind, digest_sha256, byte_length, content_included, revision_verified]
+          properties:
+            kind: {type: string, const: LOCAL_FIXTURE}
+            digest_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+            byte_length: {type: integer, minimum: 0}
+            content_included: {type: boolean, const: false}
+            revision_verified: {type: boolean, const: false}
+        coverage:
+          type: object
+          additionalProperties: false
+          required: [scan_mode, paths, pages_evaluated, rule_ids_evaluated, browser_rendered, wcag_conformance_claim]
+          properties:
+            scan_mode: {type: string, const: STATIC_LOCAL_HTML_FIXTURE}
+            paths:
+              type: array
+              const: [/]
+              items: {type: string}
+            pages_evaluated: {type: integer, const: 1}
+            rule_ids_evaluated:
+              type: array
+              const: [image-alt]
+              items: {type: string}
+            browser_rendered: {type: boolean, const: false}
+            wcag_conformance_claim: {type: boolean, const: false}
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessibilityFinding'
+        proposals:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceProposal'
+        limitations:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [SOURCE_REVISION_NOT_VERIFIED, RAW_SOURCE_AND_PATCH_CONTENT_OMITTED, NOT_SIGNED_OR_IMMUTABLE, NOT_A_WCAG_CONFORMANCE_CLAIM]
+        bundle_sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 of minified UTF-8 JSON with this property omitted; recursively sort object keys in ascending Unicode code-point order, retain array order, encode non-ASCII characters as UTF-8, use JSON string escapes, allow only string/integer/boolean/null/container values (no floats), and add no trailing newline. Integrity check only, not a signature.
+    EvidenceProposal:
+      type: object
+      additionalProperties: false
+      required: [id, finding_id, base_sha, patch_sha256, source_sha256, patched_source_sha256, content_integrity_verified, status, retest_status, version, reviews]
+      properties:
+        id: {type: string, format: uuid}
+        finding_id: {type: string, format: uuid}
+        base_sha: {type: string, pattern: '^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$'}
+        patch_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        source_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        patched_source_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        content_integrity_verified: {type: boolean, const: true}
+        status: {type: string}
+        retest_status: {type: string}
+        version: {type: integer, minimum: 1}
+        reviews:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, actor_id, decision, manual_check_status, proposal_version]
+            properties:
+              id: {type: string, format: uuid}
+              actor_id: {type: string, format: uuid}
+              decision: {type: string, enum: [approve, reject]}
+              manual_check_status: {type: string, enum: [passed, failed, not_applicable]}
+              proposal_version: {type: integer, minimum: 1}
     FixProposal:
       type: object
       additionalProperties: false
@@ -1710,4 +1892,3 @@ components:
           - string
           - 'null'
 x-design-status: REVIEW_REQUIRED_NOT_IMPLEMENTED
-
