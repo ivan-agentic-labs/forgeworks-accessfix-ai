@@ -19,6 +19,8 @@ jobs:
         run: python -m pip install -r scripts/requirements-verification.txt
       - name: Check bootstrap structure and sensitive content
         run: python scripts/verify_bootstrap.py
+      - name: Validate SHA-bound evidence receipts
+        run: python scripts/verify_evidence_receipts.py
       - name: Check contract shape and event schema
         run: python scripts/verify_contracts.py
       - name: Independent OpenAPI semantic validation

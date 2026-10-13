@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:forgeworks:evidence-receipt:1.0",
+  "title": "ForgeWorks Evidence Receipt",
+  "description": "A scoped, source-bound record of verification evidence. It is not by itself a release approval.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "repository",
+    "product",
+    "record_type",
+    "recorded_on",
+    "evaluated_source_commit",
+    "gate_assessment",
+    "evidence",
+    "limitations",
+    "source_documents"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "record_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{5,127}$"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+    "product": {"type": "string", "minLength": 1},
+    "record_type": {"const": "baseline_snapshot"},
+    "recorded_on": {"type": "string", "format": "date"},
+    "evaluated_source_commit": {"$ref": "#/$defs/sha"},
+    "gate_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["g1_d", "g1_e", "production_acceptance"],
+      "properties": {
+        "g1_d": {"enum": ["PASS", "CONDITIONAL_PENDING_SIGNOFF", "OPEN", "BLOCKED", "NOT_ASSESSED"]},
+        "g1_e": {"enum": ["PASS", "PARTIAL_OPEN_BLOCKED", "OPEN", "BLOCKED", "NOT_ASSESSED"]},
+        "production_acceptance": {"enum": ["ACCEPTED", "NOT_ACCEPTED", "NOT_ASSESSED"]}
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/evidenceItem"}
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "source_documents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "url"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "url": {"type": "string", "format": "uri"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha": {"type": "string", "pattern": "^[a-fA-F0-9]{40}$"},
+    "evidenceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "name",
+        "status",
+        "run_id",
+        "url",
+        "environment",
+        "workflow_commit",
+        "subject_commit",
+        "subject_identity",
+        "scope",
+        "limitations"
+      ],
+      "properties": {
+        "kind": {"enum": ["application_ci", "contract_validation", "postgres_runtime", "staging_readiness", "browser_fixture", "security_review", "acceptance", "other"]},
+        "name": {"type": "string", "minLength": 1},
+        "status": {"enum": ["PASS", "PARTIAL", "FAIL", "BLOCKED", "NOT_RUN"]},
+        "run_id": {"type": "string", "minLength": 1},
+        "url": {"type": "string", "format": "uri"},
+        "environment": {"enum": ["CI", "DISPOSABLE", "STAGING", "PRODUCTION", "LOCAL"]},
+        "workflow_commit": {"$ref": "#/$defs/sha"},
+        "subject_commit": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha"},
+            {"type": "null"}
+          ]
+        },
+        "subject_identity": {"enum": ["VERIFIED", "UNKNOWN", "NOT_APPLICABLE"]},
+        "scope": {"type": "string", "minLength": 1},
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "reviewers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "reference"],
+            "properties": {
+              "role": {"type": "string", "minLength": 1},
+              "reference": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"subject_identity": {"const": "VERIFIED"}}, "required": ["subject_identity"]},
+          "then": {"properties": {"subject_commit": {"$ref": "#/$defs/sha"}}}
+        },
+        {
+          "if": {"properties": {"subject_identity": {"enum": ["UNKNOWN", "NOT_APPLICABLE"]}}, "required": ["subject_identity"]},
+          "then": {"properties": {"subject_commit": {"type": "null"}}}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "acceptance"}}, "required": ["kind"]},
+          "then": {"required": ["reviewers"], "properties": {"reviewers": {"minItems": 1}}}
+        }
+      ]
+    }
+  }
+}
