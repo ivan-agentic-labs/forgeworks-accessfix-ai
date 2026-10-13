@@ -73,3 +73,11 @@ See [current G1/G2 evidence](docs/verification/CURRENT_GATE_EVIDENCE.md), [exact
 ## Hosted release verification
 
 See [runtime identity, private telemetry and production acceptance](ops/runbooks/RUNTIME_RELEASE_VERIFICATION.md). Hosted releases expose a bounded source fingerprint and require a separate server-only metrics credential. Production startup requires separate infrastructure and an actual trusted, signed acceptance receipt. An unsigned template or passing synthetic CI does not establish production acceptance.
+
+
+## Current owner specification and unified application
+
+- **Owner design revision (2026-10-13):** [product specification](docs/specifications/PRODUCT_SPECIFICATION_2026-10-13.md). This is a **design target**, not proof every feature exists.
+- **Five ForgeWorks products, one future application/domain:** [architecture](docs/platform/ONE_APP_FIVE_SERVICES.md). SealAngel Work is a separate planned repository/application/domain; neither domain name is configured by this documentation.
+- **Actual implemented and verified behavior:** keep using [current scoped evidence](docs/verification/CURRENT_GATE_EVIDENCE.md) and the [hosted runbook](ops/runbooks/RUNTIME_RELEASE_VERIFICATION.md). Local tests, staging claims and production acceptance are different gates.
+- The 2026-10-09 G2 bootstrap record remains historical and must not be mistaken for today's repository status.
