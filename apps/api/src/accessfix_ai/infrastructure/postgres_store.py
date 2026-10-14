@@ -127,6 +127,14 @@ class PostgresStore(Store):
             open=False, name="accessfix-ai-runtime",
         )
 
+    def readiness_check(self):
+        """Check database health through the already-bounded runtime connection pool."""
+        self._pool.open()
+        with self._pool.connection(timeout=3) as db:
+            row = db.execute("SELECT 1 AS alive").fetchone()
+            if not row or row["alive"] != 1:
+                raise RuntimeError("READINESS_DATABASE_CHECK_FAILED")
+
     def start_pool(self):
         self._pool.open(wait=True, timeout=8)
 

@@ -143,9 +143,10 @@ def readiness(store) -> dict:
         if os.getenv("APP_ENV", "development") not in {"development", "test"} and not dsn:
             problem(503, "NOT_READY", "PostgreSQL is required outside development/test")
         if dsn:
-            import psycopg
-            with psycopg.connect(dsn, connect_timeout=5) as db:
-                db.execute("SELECT 1")
+            checker = getattr(store, "readiness_check", None)
+            if not callable(checker):
+                problem(503, "NOT_READY", "Database readiness adapter unavailable")
+            checker()
         return {"status": "ready"}
     except HTTPException:
         raise
