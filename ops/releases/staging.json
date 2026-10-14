@@ -2,35 +2,36 @@
   "schema": "forgeworks-staging-release-v1",
   "product": "accessfix-ai",
   "environment": "staging",
-  "revision_sha": "50affc6e61d8517c6e888901bae49b51299a294b",
+  "revision_sha": "023265e7e34b9328f6bb14c41d862ff4e05f6783",
   "runtime_manifest": {
     "profile": "forgeworks-runtime-manifest-v1",
     "file_count": 37,
-    "sha256": "cd226a9777e79c9edd12bd3ff8ca8d30202308d47e790ea5a60f3c02ba597bf4"
+    "sha256": "03aa35bb7beeaa40985f26f7b7dcf345fcfd341956d032965b326aaa25599fa0"
   },
   "railway_project_id": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
   "railway_environment_id": "0395e7ac-10f8-4004-8bb7-ddee901343c7",
   "railway_service_id": "16693650-fec8-48e4-b934-e032dd391808",
-  "deployment_id": "48d374ff-6bd1-480e-9354-07b0c3b00304",
+  "deployment_id": "fd7e55a1-cd78-448c-a892-4c38827daede",
   "deployment_status": "SUCCESS",
-  "observed_at": "2026-10-14T06:18:43Z",
+  "observed_at": "2026-10-14T06:57:52Z",
   "ci_urls": [
     "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/38518454888",
-    "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38521516802"
+    "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38521516802",
+    "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38525437249"
   ],
   "hosted_probe": {
     "result": "PASS",
-    "scope": "Exact fleet staging identity/readiness and anonymous access boundaries",
-    "proof_url": "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38521516802",
+    "scope": "Exact five-product public staging identity, readiness and anonymous access boundaries",
+    "proof_url": "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38525437249",
     "private_metrics": "NOT_VERIFIED",
     "authenticated_tenant": "NOT_VERIFIED",
-    "observed_at": "2026-10-14T06:18:43Z"
+    "observed_at": "2026-10-14T06:57:52Z"
   },
   "production_acceptance": "NOT_ACCEPTED",
   "rollback": {
-    "previous_revision_sha": "895926525216620e87e3f7c88bef8b7b0849e731",
-    "previous_deployment_id": "2f7b5ec3-094a-47c7-b8f6-c77a7532d84f",
-    "notes": "Rollback needs matching source/release SHA and verified region; rollback of schema or data is separately reviewed."
+    "previous_revision_sha": "50affc6e61d8517c6e888901bae49b51299a294b",
+    "previous_deployment_id": "48d374ff-6bd1-480e-9354-07b0c3b00304",
+    "notes": "Pin previous source SHA and corresponding release SHA together; database migration rollback requires separate review."
   },
   "limits": [
     "No authenticated cross-tenant or real business integration acceptance",
