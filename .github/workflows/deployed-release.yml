@@ -2,8 +2,13 @@ name: Deployed Release Identity Proof
 on:
   push:
     branches: [main]
-    paths: [ops/releases/staging.json]
+    paths:
+      - ops/releases/staging.json
+      - scripts/probe_deployed_release.py
+      - .github/workflows/deployed-release.yml
   workflow_dispatch:
+  schedule:
+    - cron: '23 3 * * *' # 10:23 Asia/Jakarta, daily strict staging drift proof
 permissions:
   contents: read
 jobs:
