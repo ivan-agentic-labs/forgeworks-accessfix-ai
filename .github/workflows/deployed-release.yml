@@ -20,7 +20,17 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
+      - name: Resolve validated pinned deployment revision
+        id: release
+        run: |
+          python -c 'import json,os,re; sha=json.load(open("ops/releases/staging.json"))["revision_sha"]; assert isinstance(sha,str) and re.fullmatch("[0-9a-f]{40}",sha); open(os.environ["GITHUB_OUTPUT"],"a").write("sha="+sha+"\n")'
+      - name: Checkout exact deployed revision for manifest verification
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.release.outputs.sha }}
+          path: pinned-release
+          persist-credentials: false
       - name: Install locked runtime
         run: python -m pip install --require-hashes -r requirements-runtime.lock
       - name: Verify fixed staging origin against reviewed release record
-        run: python scripts/probe_deployed_release.py
+        run: python scripts/probe_deployed_release.py --source-root pinned-release
