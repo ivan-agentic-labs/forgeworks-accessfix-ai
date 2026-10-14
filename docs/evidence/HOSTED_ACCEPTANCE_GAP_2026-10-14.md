@@ -36,3 +36,14 @@ The membership observation comes from a read-only grouped-status SQL query. Revo
 A public `/healthz`, `/readyz` or anonymous HTTP 401 proves availability/boundary only. Production acceptance requires authenticated real end-to-end product and tenant proof. Current acceptance template stays UNSIGNED and all controls OPEN. Do not mark green because documentation or CI is present.
 
 Audited references: [G3 fixture inventory](https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/blob/main/docs/platform/STAGING_G3_AUTH_FIXTURE_READINESS_2026-10-14.md), [G3 acceptance harness](https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/blob/main/scripts/probe_authenticated_tenant_isolation.py), [Staging release](https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/blob/main/ops/releases/staging.json).
+
+## Owner-authorized staging provisioning update — 2026-10-14 (after audit snapshot)
+
+This section is **newer than the read-only audit snapshot above** and must not overwrite its historical observations.
+
+- Owner gave explicit permission to provision fresh staging-only test principals, tenant fixtures, and synthetic acceptance data for the five-product ForgeWorks fleet.
+- Connected Supabase management SQL created two **new** `ACTIVE` tenants for this product in project `fljekuwplgkrpdoajyhn`, one `g3-owner-20261014-tenant-a` and one `g3-owner-20261014-tenant-b`; a second SELECT verified two rows per product, five per slot across the fleet (10 total).
+- Separate membership JOIN verified **zero memberships** attached to the new tenants in each product. No old `REVOKED` records or user accounts were modified.
+- `forgeworks-apishield-agent/scripts/g3_staging_grants.sql` constructs exactly two server-owned Auth `app_metadata` grant plans with five narrow read scopes, one per product. It is read-only and does not confer access.
+- **Auth Admin createUser/updateUserById is not supported by the connected Supabase app.** Railway OAuth lists variables but does not expose a privileged Auth Admin key, and app services have publishable keys only. Therefore no new Auth users or active memberships were created.
+- The owner-controlled Auth Admin step, active membership registration, ten real business fixtures, authenticated hosted G3 test, write-isolation and revocation tests all remain **BLOCKED / NOT_ACCEPTED**. See [the central operator runbook](https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/blob/main/ops/runbooks/G3_OWNER_STAGING_PROVISIONING_2026-10-14.md).
