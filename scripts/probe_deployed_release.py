@@ -91,8 +91,11 @@ def verify_release(expected_revision, expected_manifest, request=fetch, metrics_
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--expected-revision")
+    parser.add_argument("--source-root", type=Path, default=ROOT)
     args = parser.parse_args()
-    manifest = runtime_manifest(ROOT)
+    if args.source_root.is_symlink() or not args.source_root.is_dir():
+        raise ValueError("RELEASE_SOURCE_ROOT_INVALID")
+    manifest = runtime_manifest(args.source_root)
     revision = args.expected_revision
     if not revision:
         record = json.loads((ROOT / "ops/releases/staging.json").read_bytes(),
