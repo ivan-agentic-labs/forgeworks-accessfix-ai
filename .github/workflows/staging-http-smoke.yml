@@ -42,3 +42,19 @@ jobs:
             python -c 'import json,sys; x=json.load(sys.stdin); assert x.get("enabled") is True; assert x.get("product")=="accessfix-ai"; assert x.get("environment")=="staging"; assert x.get("publishable_key","").startswith("sb_publishable_"); assert x.get("supabase_url","").startswith("https://"); assert x.get("supabase_url","").endswith(".supabase.co"), "Auth client config invalid"'
           echo "Public staging Auth client configuration validated; no token or credential was logged."
           echo "Public staging liveness/readiness response verified; this does not prove authenticated product acceptance."
+
+      - name: Verify runtime identity and private metrics boundary
+        env:
+          BASE_URL: https://accessfix-ai-staging.up.railway.app
+          EXPECTED_PRODUCT: accessfix-ai
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 20 --connect-timeout 10 --max-filesize 4096 "$BASE_URL/versionz" |
+            python -c 'import json,os,re,sys; d=json.load(sys.stdin); m=d.get("runtime_manifest"); assert set(d)=={"product","environment","revision_sha","runtime_manifest"}; assert d["product"]==os.environ["EXPECTED_PRODUCT"] and d["environment"]=="staging"; assert re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}",d["revision_sha"]); assert isinstance(m,dict) and m.get("profile")=="forgeworks-runtime-manifest-v1"; assert type(m.get("file_count")) is int and 0<m["file_count"]<=256; assert re.fullmatch(r"[0-9a-f]{64}",m.get("sha256",""))'
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 --connect-timeout 10 "$BASE_URL/metricsz")"
+          if [[ "$status" != "401" ]]; then
+            echo "Private metrics endpoint did not deny anonymous access (HTTP $status)"
+            exit 1
+          fi
+          echo "Runtime identity shape and anonymous private metrics boundary passed."
