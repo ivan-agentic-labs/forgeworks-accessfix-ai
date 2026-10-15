@@ -197,7 +197,20 @@ def register_operations(app, root: Path, product: str) -> None:
     def version():
         try:
             identity = runtime_identity(root, product)
-        except (OSError, ValueError):
+        except (OSError, ValueError) as error:
+            # Internal diagnostic categories only. Never log environment
+            # variable values, filesystem paths, or private release metadata.
+            expected_codes = {
+                "RUNTIME_REVISION_BINDING_MISMATCH",
+                "RUNTIME_REVISION_REQUIRED",
+                "RUNTIME_REVISION_INVALID",
+                "RUNTIME_ENVIRONMENT_INVALID",
+                "RUNTIME_MANIFEST_FILE_BUDGET",
+                "RUNTIME_MANIFEST_UNSAFE_PATH",
+                "RUNTIME_MANIFEST_BYTE_BUDGET",
+            }
+            reason = str(error) if isinstance(error, ValueError) and str(error) in expected_codes else "IO_FAILURE"
+            logger.warning("runtime.identity.unavailable product=%s reason=%s", product, reason)
             raise HTTPException(503, detail={"code": "RUNTIME_IDENTITY_UNAVAILABLE"}) from None
         return JSONResponse(identity, headers={"Cache-Control": "no-store"})
 
