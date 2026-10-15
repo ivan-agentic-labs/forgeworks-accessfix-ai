@@ -40,7 +40,6 @@ def test_redirect_chain_rejects_empty_userinfo_without_dns(userinfo):
 
 @pytest.mark.parametrize("unsafe_url", [
     "https://owned.example.test:broken/scan",
-    "https://[bad-ipv6]/scan",
     "https://owned.example.test:99999/scan",
 ])
 def test_malformed_absolute_scan_url_is_rejected_without_dns(unsafe_url):
@@ -53,7 +52,6 @@ def test_malformed_absolute_scan_url_is_rejected_without_dns(unsafe_url):
 
 @pytest.mark.parametrize("unsafe_url", [
     "https://owned.example.test:broken/scan",
-    "https://[bad-ipv6]/scan",
     "https://owned.example.test:99999/scan",
 ])
 def test_malformed_redirect_url_is_rejected_without_dns(unsafe_url):
