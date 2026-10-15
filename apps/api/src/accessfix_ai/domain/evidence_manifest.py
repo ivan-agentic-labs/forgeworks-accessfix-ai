@@ -20,7 +20,7 @@ def _valid_uuid(value: str) -> str:
 
 
 def _valid_datetime(value: str) -> str:
-    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})", value):
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})", value):
         raise ValueError("must use RFC 3339 date-time format")
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
