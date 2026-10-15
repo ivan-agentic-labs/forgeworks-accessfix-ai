@@ -1,0 +1,32 @@
+name: Staging Release Drift Report
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compare source with recorded hosted release
+        run: |
+          python scripts/check_staging_release_drift.py --main-sha "$GITHUB_SHA" > staging-drift.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          result = json.loads(Path("staging-drift.json").read_text())
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as handle:
+              handle.write("## Staging release currency\n\n")
+              handle.write(f"Result: **{result['status']}**\n\n")
+              handle.write(f"Source: \`{result['github_main_sha']}\`\n\n")
+              handle.write(f"Recorded deployed release: \`{result['recorded_deployment_sha']}\`\n\n")
+              handle.write("This is not proof of current live deployment or production acceptance.\n")
+          if not result["record_is_current"]:
+              print("::warning::GitHub HEAD is newer than the reviewed staging release; hosted acceptance of HEAD is NOT established")
+          PY
