@@ -36,3 +36,33 @@ def test_redirect_chain_rejects_empty_userinfo_without_dns(userinfo):
             "https://owned.example.test",
             resolver=no_dns,
         )
+
+
+@pytest.mark.parametrize("unsafe_url", [
+    "https://owned.example.test:broken/scan",
+    "https://[bad-ipv6]/scan",
+    "https://owned.example.test:99999/scan",
+])
+def test_malformed_absolute_scan_url_is_rejected_without_dns(unsafe_url):
+    def no_dns(_host):
+        raise AssertionError("invalid URL must be rejected before DNS")
+
+    with pytest.raises(ValueError, match="path leaves verified origin"):
+        validate_scan_path(unsafe_url, "https://owned.example.test", resolver=no_dns)
+
+
+@pytest.mark.parametrize("unsafe_url", [
+    "https://owned.example.test:broken/scan",
+    "https://[bad-ipv6]/scan",
+    "https://owned.example.test:99999/scan",
+])
+def test_malformed_redirect_url_is_rejected_without_dns(unsafe_url):
+    def no_dns(_host):
+        raise AssertionError("invalid redirect must be rejected before DNS")
+
+    with pytest.raises(ValueError, match="redirect leaves verified origin"):
+        validate_redirect_chain(
+            ["https://owned.example.test/", unsafe_url],
+            "https://owned.example.test",
+            resolver=no_dns,
+        )
