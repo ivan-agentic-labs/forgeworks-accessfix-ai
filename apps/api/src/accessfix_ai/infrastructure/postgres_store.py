@@ -124,6 +124,9 @@ class PostgresStore(Store):
             dsn, kwargs={"row_factory": dict_row, "connect_timeout": 5,
                          "prepare_threshold": None},
             min_size=1, max_size=4, timeout=5, max_waiting=16,
+            # Reject and replace dead idle connections before exposing them to
+            # readiness checks or tenant-scoped application transactions.
+            check=ConnectionPool.check_connection,
             open=False, name="accessfix-ai-runtime",
         )
 
