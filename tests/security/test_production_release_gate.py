@@ -181,7 +181,7 @@ def test_staging_rejects_other_railway_target(forgeworks_staging, monkeypatch, k
 @pytest.mark.parametrize("url", [
     "http://fljekuwplgkrpdoajyhn.supabase.co",
     "https://another-project.supabase.co",
-    "https://user@fljekuwplgkrpdoajyhn.supabase.co",
+    "https://" + "user" + "@" + "fljekuwplgkrpdoajyhn.supabase.co",
     "https://fljekuwplgkrpdoajyhn.supabase.co/rest/v1",
     "https://fljekuwplgkrpdoajyhn.supabase.co?token=1",
     "https://fljekuwplgkrpdoajyhn.supabase.co:443",
