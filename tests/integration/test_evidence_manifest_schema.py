@@ -108,3 +108,26 @@ def test_manifest_const_requires_exact_json_primitive_type(path, invalid_value):
     target[path[-1]] = invalid_value
     with pytest.raises(ValidationError):
         EvidenceExport.model_validate(corrupted)
+
+
+@pytest.mark.parametrize("value", [
+    "2026-10-13T09:00:00.1234567Z",
+    "2026-10-13T09:00:00.123456789+07:00",
+    "2026-10-13T09:00:00.Z",
+])
+def test_evidence_timestamp_rejects_ambiguous_precision(value):
+    payload = valid_manifest()
+    payload["exported_at"] = value
+    with pytest.raises(ValidationError):
+        EvidenceExport.model_validate(payload)
+
+
+@pytest.mark.parametrize("value", [
+    "2026-10-13T09:00:00Z",
+    "2026-10-13T09:00:00.123456+07:00",
+    "2026-10-13T09:00:00.1+00:00",
+])
+def test_evidence_timestamp_accepts_unambiguous_rfc3339_precision(value):
+    payload = valid_manifest()
+    payload["exported_at"] = value
+    assert EvidenceExport.model_validate(payload).exported_at == value
