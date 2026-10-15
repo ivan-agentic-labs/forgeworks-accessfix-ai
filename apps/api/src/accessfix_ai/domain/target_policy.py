@@ -101,17 +101,23 @@ def validate_origin(origin: str, allow_fixture: bool = True) -> str:
 
 def _same_origin(candidate: str, origin: str) -> bool:
     _reject_unsafe_url_bytes(candidate)
-    target = urlparse(candidate)
-    verified = urlparse(origin)
-    return (
-        target.scheme == verified.scheme
-        and target.hostname is not None
-        and target.hostname.lower() == (verified.hostname or "").lower()
-        and target.port == verified.port
-        and "@" not in target.netloc
-        and not target.username
-        and not target.password
-    )
+    # Accessing .port or .hostname can raise ValueError for untrusted URLs
+    # (malformed ports or IPv6 brackets). Treat them as a rejected origin
+    # before DNS or the scanning browser sees them.
+    try:
+        target = urlparse(candidate)
+        verified = urlparse(origin)
+        return (
+            target.scheme == verified.scheme
+            and target.hostname is not None
+            and target.hostname.lower() == (verified.hostname or "").lower()
+            and target.port == verified.port
+            and "@" not in target.netloc
+            and not target.username
+            and not target.password
+        )
+    except ValueError:
+        return False
 
 
 def _require_bounded_path(path: str) -> None:
