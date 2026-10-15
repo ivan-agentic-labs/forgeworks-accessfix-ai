@@ -74,3 +74,59 @@ def test_private_metrics_are_opt_in_and_secret_never_reported(probe, responses):
 def test_probe_rejects_unknown_path_before_network(probe):
     with pytest.raises(ValueError, match="PATH_FORBIDDEN"):
         probe.fetch("/admin/reset")
+
+
+def test_transient_readiness_retries_are_bounded_and_visible(probe, responses):
+    manifest, values = responses
+    counts = {"/healthz": 0, "/readyz": 0}
+    sleeps = []
+
+    def request(path):
+        if path in counts:
+            counts[path] += 1
+            if path == "/healthz" and counts[path] == 1:
+                return 503, None
+            if path == "/readyz" and counts[path] == 1:
+                return 429, None
+            if path == "/readyz" and counts[path] == 2:
+                return 503, None
+        return values[path]
+
+    result = probe.verify_release("a" * 40, manifest, request=request,
+                                  sleep=sleeps.append)
+    assert result["result"] == "PASS"
+    assert result["health_attempts"] == 2
+    assert result["readiness_attempts"] == 3
+    assert counts == {"/healthz": 2, "/readyz": 3}
+    assert sleeps == pytest.approx([0.2, 0.2, 0.4])
+
+
+def test_persistent_readiness_failure_stays_failed_after_three_attempts(probe, responses):
+    manifest, values = responses
+    paths = []
+
+    def request(path):
+        paths.append(path)
+        return (503, None) if path == "/readyz" else values[path]
+
+    with pytest.raises(ValueError, match="RELEASE_READINESS_FAILED"):
+        probe.verify_release("a" * 40, manifest, request=request, sleep=lambda _: None)
+    assert paths == ["/healthz", "/readyz", "/readyz", "/readyz"]
+
+
+def test_nontransient_health_and_identity_are_not_retried(probe, responses):
+    manifest, values = responses
+    calls = []
+
+    def request(path):
+        calls.append(path)
+        return (401, None) if path == "/readyz" else values[path]
+
+    with pytest.raises(ValueError, match="RELEASE_READINESS_FAILED"):
+        probe.verify_release("a" * 40, manifest, request=request,
+                             sleep=lambda _: pytest.fail("unexpected sleep"))
+    assert calls == ["/healthz", "/readyz"]
+
+    with pytest.raises(ValueError, match="RELEASE_RETRY_PATH_FORBIDDEN"):
+        probe.probe_health_with_bounded_retry("/versionz", request, lambda _: None)
+    assert calls == ["/healthz", "/readyz"]

@@ -4,6 +4,7 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 from secrets import token_hex
 from urllib.error import HTTPError
@@ -53,14 +54,32 @@ def fetch(path, secret=None, max_bytes=4096):
     return status, json.loads(raw, object_pairs_hook=unique_object)
 
 
-def verify_release(expected_revision, expected_manifest, request=fetch, metrics_secret=None):
+def probe_health_with_bounded_retry(path, request, sleep=time.sleep):
+    """Retry only idempotent health probes on explicit transient HTTP status.
+
+    Authorization, release identity, and metrics checks are always single-shot.
+    Persistent failures remain failures; no exception, malformed payload, or
+    non-transient HTTP status is disguised as a passing release.
+    """
+    if path not in {"/healthz", "/readyz"}:
+        raise ValueError("RELEASE_RETRY_PATH_FORBIDDEN")
+    for attempt in range(1, 4):
+        status, payload = request(path)
+        if status not in {429, 503} or attempt == 3:
+            return status, payload, attempt
+        sleep(0.2 * (2 ** (attempt - 1)))
+    raise AssertionError("unreachable")
+
+
+def verify_release(expected_revision, expected_manifest, request=fetch, metrics_secret=None,
+                   sleep=time.sleep):
     if not isinstance(expected_revision, str) or not re.fullmatch(
             r"[0-9a-f]{40}|[0-9a-f]{64}", expected_revision):
         raise ValueError("RELEASE_REVISION_REQUIRED")
-    status, health = request("/healthz")
+    status, health, health_attempts = probe_health_with_bounded_retry("/healthz", request, sleep)
     if status != 200 or not isinstance(health, dict) or health.get("status") != "ok":
         raise ValueError("RELEASE_HEALTH_FAILED")
-    status, ready = request("/readyz")
+    status, ready, readiness_attempts = probe_health_with_bounded_retry("/readyz", request, sleep)
     if status != 200 or not isinstance(ready, dict) or ready.get("status") != "ready":
         raise ValueError("RELEASE_READINESS_FAILED")
     status, identity = request("/versionz")
@@ -85,6 +104,7 @@ def verify_release(expected_revision, expected_manifest, request=fetch, metrics_
     return {"result": "PASS", "product": PRODUCT, "environment": "staging",
             "revision_sha": expected_revision, "runtime_manifest": expected_manifest,
             "private_metrics": private_metrics,
+            "health_attempts": health_attempts, "readiness_attempts": readiness_attempts,
             "limits": "Runtime identity and anonymous boundaries only; no authenticated business acceptance"}
 
 
