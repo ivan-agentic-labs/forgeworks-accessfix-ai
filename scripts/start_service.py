@@ -33,6 +33,18 @@ def validate_configuration():
     if os.getenv("ACCESSFIX_SEED_FIXTURE", "0") != "0" or os.getenv("DEV_AUTH_SECRET"):
         raise ValueError("HOSTED_DEVELOPMENT_CONFIGURATION_FORBIDDEN")
     if environment == "staging":
+        # Bind staging to the dedicated ForgeWorks Railway and Supabase projects.
+        # Unexpected/missing platform identifiers fail closed before listening.
+        if (os.getenv("RAILWAY_PROJECT_ID") != STAGING_PROJECT
+                or os.getenv("RAILWAY_ENVIRONMENT_ID") != STAGING_ENVIRONMENT):
+            raise ValueError("STAGING_RAILWAY_TARGET_MISMATCH")
+        target = urlsplit(os.getenv("SUPABASE_URL", ""))
+        if (target.scheme != "https"
+                or target.hostname != f"{STAGING_SUPABASE}.supabase.co"
+                or target.path not in {"", "/"}
+                or target.query or target.fragment
+                or "@" in target.netloc or target.port is not None):
+            raise ValueError("STAGING_SUPABASE_TARGET_MISMATCH")
         return {"environment": environment, "acceptance": "NOT_APPLICABLE"}
     identity = runtime_identity(ROOT, PRODUCT)
     project = platform_uuid("RAILWAY_PROJECT_ID")

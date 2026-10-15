@@ -150,3 +150,50 @@ def test_staging_cannot_be_relabelled_production(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", f"https://{module.STAGING_SUPABASE}.supabase.co")
     with pytest.raises(ValueError, match="SEPARATE_PRODUCTION"):
         module.validate_configuration()
+
+
+@pytest.fixture
+def forgeworks_staging(monkeypatch):
+    module = load_entrypoint()
+    monkeypatch.setenv("APP_ENV", "staging")
+    monkeypatch.setenv("AUTH_MODE", "supabase")
+    monkeypatch.setenv("ACCESSFIX_DATABASE_URL", "postgresql://runtime-placeholder")
+    monkeypatch.setenv("ACCESSFIX_SEED_FIXTURE", "0")
+    monkeypatch.delenv("DEV_AUTH_SECRET", raising=False)
+    monkeypatch.setenv("RAILWAY_PROJECT_ID", module.STAGING_PROJECT)
+    monkeypatch.setenv("RAILWAY_ENVIRONMENT_ID", module.STAGING_ENVIRONMENT)
+    monkeypatch.setenv("SUPABASE_URL", f"https://{module.STAGING_SUPABASE}.supabase.co")
+    return module
+
+
+def test_staging_accepts_exact_forgeworks_infrastructure(forgeworks_staging):
+    assert forgeworks_staging.validate_configuration() == {
+        "environment": "staging", "acceptance": "NOT_APPLICABLE"}
+
+
+@pytest.mark.parametrize("key", ["RAILWAY_PROJECT_ID", "RAILWAY_ENVIRONMENT_ID"])
+def test_staging_rejects_other_railway_target(forgeworks_staging, monkeypatch, key):
+    monkeypatch.setenv(key, "00000000-0000-4000-8000-000000000000")
+    with pytest.raises(ValueError, match="STAGING_RAILWAY_TARGET_MISMATCH"):
+        forgeworks_staging.validate_configuration()
+
+
+@pytest.mark.parametrize("url", [
+    "http://fljekuwplgkrpdoajyhn.supabase.co",
+    "https://another-project.supabase.co",
+    "https://user@fljekuwplgkrpdoajyhn.supabase.co",
+    "https://fljekuwplgkrpdoajyhn.supabase.co/rest/v1",
+    "https://fljekuwplgkrpdoajyhn.supabase.co?token=1",
+    "https://fljekuwplgkrpdoajyhn.supabase.co:443",
+    "",
+])
+def test_staging_rejects_other_or_unsafe_supabase(forgeworks_staging, monkeypatch, url):
+    monkeypatch.setenv("SUPABASE_URL", url)
+    with pytest.raises(ValueError, match="STAGING_SUPABASE_TARGET_MISMATCH"):
+        forgeworks_staging.validate_configuration()
+
+
+def test_staging_rejects_missing_railway_binding(forgeworks_staging, monkeypatch):
+    monkeypatch.delenv("RAILWAY_ENVIRONMENT_ID")
+    with pytest.raises(ValueError, match="STAGING_RAILWAY_TARGET_MISMATCH"):
+        forgeworks_staging.validate_configuration()
