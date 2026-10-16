@@ -18,7 +18,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
 from accessfix_ai.infrastructure.security_catalog import verify_tenant_catalog
-from accessfix_ai.infrastructure.store import Store, now, later, validate_attempt_budget
+from accessfix_ai.infrastructure.store import Store, now, later, validate_attempt_budget, validate_timing_budget
 
 TENANT_CONTEXT = ContextVar("accessfix_tenant", default=None)
 ROLE = "fw_accessfix_ai_rw"
@@ -207,6 +207,7 @@ class PostgresStore(Store):
         raise ValueError("PostgreSQL provisioning requires a separate migration/provisioning role")
     def claim_scan(self, lease_seconds=5.0, timeout_seconds=30.0, *, max_attempts=3):
         validate_attempt_budget(max_attempts)
+        validate_timing_budget(lease_seconds, timeout_seconds)
         tenants = [str(UUID(value.strip())) for value in os.getenv("ACCESSFIX_WORKER_TENANTS", "").split(",") if value.strip()]
         for tenant in tenants:
             with self.conn(tenant) as db:
