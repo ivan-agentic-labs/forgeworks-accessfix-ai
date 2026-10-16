@@ -64,3 +64,31 @@ def test_normal_international_alt_text_still_generates_applicable_patch():
     patch = build_image_alt_patch(b'<img id="hero">', "hero", "Kucing tidur di café")
     assert "Kucing tidur di café".encode() in patch["patched_source"]
     assert patch["static_retest"] == "PASSED"
+
+
+def test_image_submit_button_receives_owner_label_and_valid_retest(tmp_path):
+    source = b'<form><input id="submit" type="image" src="/submit.png"><img id="logo" src="logo.png"></form>'
+    assert [x["selector"] for x in image_alt_findings(source)] == [
+        'input[type="image"]#submit', 'img#logo'
+    ]
+    result = build_image_alt_patch(source, "submit", "Place order")
+    assert b'<input id="submit" type="image" src="/submit.png" alt="Place order">' in result["patched_source"]
+    assert result["remaining_findings"] == 1
+    assert image_alt_findings(result["patched_source"])[0]["selector"] == "img#logo"
+    (tmp_path / "source.html").write_bytes(source)
+    subprocess.run(["git", "apply", "--no-index", "-"],
+                   input=result["patch"].encode(), cwd=tmp_path,
+                   check=True, capture_output=True)
+    assert (tmp_path / "source.html").read_bytes() == result["patched_source"]
+
+
+@pytest.mark.parametrize("source", [
+    b'<input id="submit" type="text">',
+    b'<input id="submit" type="submit">',
+    b'<input id="submit" type="image" alt="">',
+    b'<input id="submit" type="image"><div id="submit"></div>',
+    b'<input id="submit" type="image" alt="one" alt="two">',
+])
+def test_image_submit_patch_rejects_ambiguous_or_unreviewed_control(source):
+    with pytest.raises(ValueError):
+        build_image_alt_patch(source, "submit", "Place order")
