@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
-from accessfix_ai.infrastructure.store import Store, validate_attempt_budget
+from accessfix_ai.infrastructure.store import Store, validate_attempt_budget, validate_timing_budget
 
 
 @dataclass(frozen=True)
@@ -15,6 +15,7 @@ class WorkerConfig:
 
     def __post_init__(self):
         validate_attempt_budget(self.max_attempts)
+        validate_timing_budget(self.lease_seconds, self.timeout_seconds)
 
 
 class ScanWorker:
@@ -53,6 +54,8 @@ class ScanWorker:
         return True
 
     def drain(self, max_steps: int = 100) -> int:
+        if type(max_steps) is not int or max_steps < 1 or max_steps > 10000:
+            raise ValueError("max_steps must be an integer between 1 and 10000")
         steps = 0
         while steps < max_steps and self.run_once():
             steps += 1
