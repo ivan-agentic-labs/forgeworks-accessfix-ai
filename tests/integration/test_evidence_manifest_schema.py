@@ -131,3 +131,23 @@ def test_evidence_timestamp_accepts_unambiguous_rfc3339_precision(value):
     payload = valid_manifest()
     payload["exported_at"] = value
     assert EvidenceExport.model_validate(payload).exported_at == value
+
+
+@pytest.mark.parametrize("missing_limitation", [
+    "SOURCE_REVISION_NOT_VERIFIED",
+    "RAW_SOURCE_AND_PATCH_CONTENT_OMITTED",
+    "NOT_SIGNED_OR_IMMUTABLE",
+    "NOT_A_WCAG_CONFORMANCE_CLAIM",
+])
+def test_evidence_export_cannot_hide_essential_verification_limitations(missing_limitation):
+    payload = valid_manifest()
+    payload["limitations"].remove(missing_limitation)
+    with pytest.raises(ValidationError, match="must disclose every scope and trust limitation"):
+        EvidenceExport.model_validate(payload)
+
+
+def test_evidence_export_rejects_duplicate_disclaimer():
+    payload = valid_manifest()
+    payload["limitations"].append(payload["limitations"][0])
+    with pytest.raises(ValidationError, match="limitations must be unique"):
+        EvidenceExport.model_validate(payload)
