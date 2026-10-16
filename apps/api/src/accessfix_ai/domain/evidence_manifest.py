@@ -167,8 +167,16 @@ class EvidenceExport(_StrictModel):
     @field_validator("limitations")
     @classmethod
     def limitations_must_be_unique(cls, value):
+        required = {
+            "SOURCE_REVISION_NOT_VERIFIED",
+            "RAW_SOURCE_AND_PATCH_CONTENT_OMITTED",
+            "NOT_SIGNED_OR_IMMUTABLE",
+            "NOT_A_WCAG_CONFORMANCE_CLAIM",
+        }
         if len(set(value)) != len(value):
             raise ValueError("limitations must be unique")
+        if set(value) != required:
+            raise ValueError("synthetic evidence must disclose every scope and trust limitation")
         return value
 
     @model_validator(mode="after")
