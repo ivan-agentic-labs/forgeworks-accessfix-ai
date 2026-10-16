@@ -31,3 +31,21 @@ def test_valueless_alt_is_not_a_verified_alternative():
 
 def test_scripts_do_not_create_fake_image_nodes():
     assert image_alt_findings(b'<script>const x = "<img>";</script>') == []
+
+def test_offline_scanner_detects_unlabelled_image_submit_controls():
+    source = b'<form><input type="IMAGE" id="submit" src="/submit.png"><input type="image" alt=""></form>'
+    findings = image_alt_findings(source)
+    assert len(findings) == 2
+    assert findings[0]["selector"] == 'input[type="image"]#submit'
+    assert findings[1]["selector"] == 'input[type="image"]'
+    assert findings[0]["fingerprint"] != findings[1]["fingerprint"]
+
+
+def test_image_submit_control_with_action_label_is_not_reported():
+    source = b'<form><input type="image" alt="Submit order"><input type="submit" value="Submit"></form>'
+    assert image_alt_findings(source) == []
+
+
+def test_duplicate_image_submit_attributes_are_rejected():
+    with pytest.raises(ValueError, match="Duplicate image attributes"):
+        image_alt_findings(b'<input type="image" alt="one" alt="two">')
