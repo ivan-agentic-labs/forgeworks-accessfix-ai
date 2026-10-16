@@ -35,12 +35,14 @@ def image_alt_findings(source: bytes) -> list[dict]:
             identifier = values.get("id")
             if identifier:
                 self.ids[identifier] = self.ids.get(identifier, 0) + 1
-            if tag == "img":
-                # Duplicate attributes are ambiguous, not safe repair targets.
+            image_control = tag == "input" and str(values.get("type") or "").lower() == "image"
+            if tag == "img" or image_control:
+                # A missing alt on an image-type submit button also leaves its
+                # action without a declared text alternative.
                 names = [key for key, _ in attrs]
                 if len(names) != len(set(names)):
                     raise ValueError("Duplicate image attributes are unsupported")
-                self.images.append((values, self.get_starttag_text()))
+                self.images.append((tag, values, self.get_starttag_text()))
 
         handle_startendtag = handle_starttag
 
@@ -48,17 +50,20 @@ def image_alt_findings(source: bytes) -> list[dict]:
     parser.feed(html)
     parser.close()
     findings = []
-    for index, (attrs, snippet) in enumerate(parser.images, 1):
-        # Empty alt is intentional decoration and requires separate human review.
-        # A valueless alt attribute is not a valid supplied alternative.
-        if "alt" in attrs and attrs["alt"] is not None:
+    for index, (tag, attrs, snippet) in enumerate(parser.images, 1):
+        # Empty alt is intentional decoration only for noninteractive images;
+        # image submit controls require a nonempty accessible action label.
+        if "alt" in attrs and attrs["alt"] is not None and (
+            tag == "img" or attrs["alt"].strip()
+        ):
             continue
         identifier = attrs.get("id")
         safe_id = identifier and all(c.isascii() and (c.isalnum() or c in "_-") for c in identifier)
         # Without a unique safe ID, a broad selector is honest; a global image
         # ordinal is not a valid CSS nth-of-type position across different parents.
-        selector = "img#" + identifier if safe_id and parser.ids[identifier] == 1 else "img"
-        fingerprint = hashlib.sha256(json.dumps([source_sha, "image-alt", index, snippet], ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+        element = 'input[type="image"]' if tag == "input" else "img"
+        selector = element + "#" + identifier if safe_id and parser.ids[identifier] == 1 else element
+        fingerprint = hashlib.sha256(json.dumps([source_sha, "image-alt", tag, index, snippet], ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
         findings.append({"rule_id": "image-alt", "severity": "SERIOUS", "selector": selector, "fingerprint": fingerprint, "manual_required": 1, "evidence_sha256": hashlib.sha256(snippet.encode()).hexdigest()})
     return findings
 
