@@ -107,9 +107,13 @@ def build_image_alt_patch(source: bytes, identifier: str, alt_text: str) -> dict
     parser = TargetParser(convert_charrefs=True)
     parser.feed(text)
     parser.close()
-    if len(matches) != 1 or matches[0][0] != "img":
+    if len(matches) != 1:
         raise ValueError("Target must be exactly one uniquely identified image")
-    _, attrs, start, raw, self_closing = matches[0]
+    tag, attrs, start, raw, self_closing = matches[0]
+    if tag != "img" and not (
+        tag == "input" and str(attrs.get("type") or "").lower() == "image"
+    ):
+        raise ValueError("Target must be an image or image-type submit control")
     if "alt" in attrs:
         raise ValueError("Existing alternative text requires a separate reviewed change")
     # A slash adjacent to an unquoted attribute value is data, not a closing
@@ -125,7 +129,12 @@ def build_image_alt_patch(source: bytes, identifier: str, alt_text: str) -> dict
         raise ValueError("Patch changed existing image attributes")
     after = image_alt_findings(patched)
     before = image_alt_findings(source)
-    if len(after) != len(before) - 1 or any(row["selector"] == "img#" + identifier for row in after):
+    expected_selector = (
+        "img#" if tag == "img" else 'input[type="image"]#'
+    ) + identifier
+    if len(after) != len(before) - 1 or any(
+        row["selector"] == expected_selector for row in after
+    ):
         raise ValueError("Static retest did not remove exactly the target finding")
     def git_lines(value):
         parts = value.split("\n")
