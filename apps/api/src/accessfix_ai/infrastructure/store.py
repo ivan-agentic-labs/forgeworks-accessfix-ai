@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import sqlite3
 import threading
 import uuid
@@ -34,6 +35,13 @@ def later(seconds: float) -> str:
 def validate_attempt_budget(max_attempts: int) -> None:
     if type(max_attempts) is not int or max_attempts < 1:
         raise ValueError("max_attempts must be a positive integer")
+
+
+def validate_timing_budget(lease_seconds: float, timeout_seconds: float) -> None:
+    """Reject values that can break leases or cause unbounded timestamps."""
+    for name, value in (("lease_seconds", lease_seconds), ("timeout_seconds", timeout_seconds)):
+        if type(value) not in (int, float) or not math.isfinite(value) or not 0 < value <= 3600:
+            raise ValueError(f"{name} must be finite and between 0 and 3600 seconds")
 
 
 class Store:
@@ -200,6 +208,7 @@ class Store:
 
     def claim_scan(self, lease_seconds: float = 5.0, timeout_seconds: float = 30.0, *, max_attempts: int = 3):
         validate_attempt_budget(max_attempts)
+        validate_timing_budget(lease_seconds, timeout_seconds)
         with self.lock, self.conn() as c:
             c.execute("BEGIN IMMEDIATE")
             current = now()
