@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 from accessfix_ai.domain.evidence_manifest import validate_evidence_export
-from accessfix_ai.domain.static_html import image_alt_findings
+from accessfix_ai.domain.static_html import image_alt_findings, MAX_SOURCE_BYTES
 
 from accessfix_ai.domain.target_policy import (
     MAX_SCAN_PATH_LENGTH,
@@ -53,6 +53,12 @@ class StartScan(BaseModel):
     model_config = ConfigDict(extra="forbid")
     repo_commit_sha: str = Field(pattern=r"^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$")
     paths: list[str] = Field(min_length=MIN_SCAN_PATHS, max_length=MAX_SCAN_PATHS)
+
+
+class OfflineHTMLScan(BaseModel):
+    """User-provided HTML only: no URL fetch, browser, or stored source."""
+    model_config = ConfigDict(extra="forbid")
+    source_html: str = Field(min_length=1, max_length=MAX_SOURCE_BYTES)
 
 
 class CreateFix(BaseModel):
@@ -214,6 +220,26 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
     @app.get("/healthz")
     def health():
         return {"status": "ok", "service": "accessfix-ai"}
+
+    @app.post("/v1/offline/html-findings")
+    def offline_html_findings(body: OfflineHTMLScan, c=Depends(scope("scan:start", store))):
+        """Analyze supplied HTML bytes only, without any remote network request."""
+        try:
+            source = body.source_html.encode("utf-8", errors="strict")
+            findings = image_alt_findings(source)
+        except (ValueError, UnicodeError) as exc:
+            return problem(422, "OFFLINE_HTML_INVALID", str(exc))
+        # Return a complete bounded set, rather than silently truncating findings.
+        if len(findings) > 500:
+            return problem(413, "OFFLINE_FINDINGS_BUDGET_EXCEEDED", "HTML contains more than 500 findings")
+        return {
+            "source_kind": "USER_SUPPLIED_HTML",
+            "scan_mode": "OFFLINE_STATIC_IMAGE_ALT",
+            "source_sha256": hashlib.sha256(source).hexdigest(),
+            "finding_count": len(findings),
+            "findings": findings,
+            "limitations": ["No remote fetch", "No browser or DOM execution", "Not a WCAG certification"],
+        }
 
     @app.post("/v1/sites/verification-challenges", status_code=201)
     def challenge(body: Challenge, response: Response, c=Depends(scope("site:verify", store))):
