@@ -16,6 +16,7 @@ AccessFix AI organizes accessibility review around authorized targets, inspectab
 | --- | --- | --- |
 | Target authorization | Development ownership challenge and target policy | A scoped, fail-closed authorization decision |
 | Accessibility inspection | Supported local synthetic page fixtures | Recorded findings tied to a scan |
+| Offline HTML inspection | User-supplied UTF-8 HTML up to 1 MiB | Source checksum and bounded missing-image-alt findings, without fetching websites |
 | Fix review | Scan findings and review decisions | Review-bound remediation proposals |
 | Retest | A selected fixture and proposed changes | A new result to compare with the earlier findings |
 
@@ -26,7 +27,7 @@ AccessFix AI organizes accessibility review around authorized targets, inspectab
 3. Review remediation proposals rather than applying changes silently.
 4. Retest and inspect the updated results in the local console.
 
-**What a team gets:** explicit inputs, a repeatable processing path, and inspectable outputs for review. The dependency-free console in [apps/web/](apps/web/) supports ownership, scan, findings, proposals, retest, and review flows against the local fixture target.
+**What a team gets:** explicit inputs, a repeatable processing path, and inspectable outputs for review. The dependency-free console in [apps/web/](apps/web/) supports a fixture-based review workflow and a separate offline HTML inspection form.
 
 ## Technical design
 
@@ -73,4 +74,4 @@ The services have separate repositories and explicit interfaces. A single custom
 
 ## Usage boundary
 
-The scanner and console operate on the local fixture target; remote browser scanning, real website audits and GitHub writes are intentionally blocked. Automated findings do not replace a manual accessibility review. Consult the linked evidence register and runbook before claiming customer-level or production acceptance.
+The scanner's full workflow remains limited to the local fixture target. In addition, an authenticated offline endpoint accepts user-supplied HTML bytes without any network fetch: `POST /v1/offline/html-findings` (requires the `scan:start` scope). Remote browser scanning, live website audits and GitHub writes remain intentionally blocked. Automated findings do not replace a manual accessibility review. Consult the linked evidence register and runbook before claiming customer-level or production acceptance.
