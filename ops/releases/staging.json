@@ -2,40 +2,41 @@
   "schema": "forgeworks-staging-release-v1",
   "product": "accessfix-ai",
   "environment": "staging",
-  "revision_sha": "023265e7e34b9328f6bb14c41d862ff4e05f6783",
+  "revision_sha": "f851003206885c8d98fe4dec855c359478cde66a",
   "runtime_manifest": {
+    "file_count": 38,
     "profile": "forgeworks-runtime-manifest-v1",
-    "file_count": 37,
-    "sha256": "03aa35bb7beeaa40985f26f7b7dcf345fcfd341956d032965b326aaa25599fa0"
+    "sha256": "10cc96e1140fcdd7e76ee3775b1f6ea0954a66d366f0ffad2d003d21dc248678"
   },
   "railway_project_id": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
   "railway_environment_id": "0395e7ac-10f8-4004-8bb7-ddee901343c7",
   "railway_service_id": "16693650-fec8-48e4-b934-e032dd391808",
-  "deployment_id": "fd7e55a1-cd78-448c-a892-4c38827daede",
+  "deployment_id": "ca090126-b750-4b9d-aaec-8aa407366b13",
   "deployment_status": "SUCCESS",
-  "observed_at": "2026-10-14T06:57:52Z",
+  "observed_at": "2026-10-17T08:31:02Z",
   "ci_urls": [
     "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/38518454888",
     "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38521516802",
-    "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38525437249"
+    "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38525437249",
+    "https://github.com/ivan-agentic-labs/forgeworks-accessfix-ai/actions/runs/39015430402"
   ],
   "hosted_probe": {
     "result": "PASS",
-    "scope": "Exact five-product public staging identity, readiness and anonymous access boundaries",
-    "proof_url": "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38525437249",
+    "scope": "Observed staging /healthz, /readyz, exact /versionz, and anonymous /metricsz denial; business and private metrics not tested",
+    "proof_url": "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/39010764090/attempts/2",
     "private_metrics": "NOT_VERIFIED",
     "authenticated_tenant": "NOT_VERIFIED",
-    "observed_at": "2026-10-14T06:57:52Z"
+    "observed_at": "2026-10-17T08:31:02Z"
   },
   "production_acceptance": "NOT_ACCEPTED",
   "rollback": {
-    "previous_revision_sha": "50affc6e61d8517c6e888901bae49b51299a294b",
-    "previous_deployment_id": "48d374ff-6bd1-480e-9354-07b0c3b00304",
-    "notes": "Pin previous source SHA and corresponding release SHA together; database migration rollback requires separate review."
+    "previous_revision_sha": "023265e7e34b9328f6bb14c41d862ff4e05f6783",
+    "previous_deployment_id": "fd7e55a1-cd78-448c-a892-4c38827daede",
+    "notes": "Historical release reference only. Availability of prior Railway deployment and database/object rollback are NOT_VERIFIED."
   },
   "limits": [
-    "No authenticated cross-tenant or real business integration acceptance",
-    "No live disaster recovery, provider audit, production SLO or privacy/legal acceptance"
+    "Public staging identity/readiness and anonymous metrics boundary verified; no authenticated cross-tenant business acceptance",
+    "No real business integration, private metrics, live disaster recovery, provider audit, production SLO or privacy/legal acceptance"
   ],
   "deployment_region": "asia-southeast1-eqsg3a"
 }
