@@ -49,3 +49,11 @@ def test_image_submit_control_with_action_label_is_not_reported():
 def test_duplicate_image_submit_attributes_are_rejected():
     with pytest.raises(ValueError, match="Duplicate image attributes"):
         image_alt_findings(b'<input type="image" alt="one" alt="two">')
+
+
+def test_whitespace_only_image_alt_is_not_valid_decorative_alt():
+    # A genuinely decorative image uses alt=""; spaces are not an explicit
+    # empty alternative and should receive an accessibility finding.
+    findings = image_alt_findings(b'<img id="whitespace" alt="   "><img alt="">')
+    assert len(findings) == 1
+    assert findings[0]["selector"] == "img#whitespace"
