@@ -2,6 +2,9 @@ name: AccessFix Staging Public Readiness
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'ops/releases/**'
+      - '.github/workflows/**'
   workflow_dispatch:
   schedule:
     - cron: '23 1,7,13,19 * * *'
@@ -12,6 +15,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Verify public liveness and readiness without credentials
         env:
           BASE_URL: https://accessfix-ai-staging.up.railway.app
@@ -47,24 +53,30 @@ jobs:
         env:
           BASE_URL: https://accessfix-ai-staging.up.railway.app
           EXPECTED_PRODUCT: accessfix-ai
+          EVENT_NAME: ${{ github.event_name }}
         shell: bash
         run: |
           set -euo pipefail
-          # Railway deployments and GitHub checks start concurrently. Poll a
-          # bounded window until the live identity matches THIS push, not just
-          # any valid-looking 40-character commit from an older deployment.
+          # On source pushes, fail closed until the new source SHA is deployed.
+          # On scheduled or manual checks, compare the pinned staging release
+          # because metadata-only commits deliberately do not redeploy.
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            export EXPECTED_REVISION="$GITHUB_SHA"
+          else
+            export EXPECTED_REVISION="$(python -c 'import json,re; s=json.load(open("ops/releases/staging.json"))["revision_sha"]; assert re.fullmatch(r"[0-9a-f]{40}",s); print(s)')"
+          fi
           current=0
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error --max-time 8 --connect-timeout 5 --max-filesize 4096 "$BASE_URL/versionz" 2>/dev/null |
-              python -c 'import json,os,re,sys; d=json.load(sys.stdin); m=d.get("runtime_manifest"); assert set(d)=={"product","environment","revision_sha","runtime_manifest"}; assert d["product"]==os.environ["EXPECTED_PRODUCT"] and d["environment"]=="staging"; assert d["revision_sha"]==os.environ["GITHUB_SHA"], "stale deployed revision"; assert isinstance(m,dict) and m.get("profile")=="forgeworks-runtime-manifest-v1"; assert type(m.get("file_count")) is int and 0<m["file_count"]<=256; assert re.fullmatch(r"[0-9a-f]{64}",m.get("sha256",""))' >/dev/null 2>&1; then
+              python -c 'import json,os,re,sys; d=json.load(sys.stdin); m=d.get("runtime_manifest"); assert set(d)=={"product","environment","revision_sha","runtime_manifest"}; assert d["product"]==os.environ["EXPECTED_PRODUCT"] and d["environment"]=="staging"; assert d["revision_sha"]==os.environ["EXPECTED_REVISION"], "stale deployed revision"; assert isinstance(m,dict) and m.get("profile")=="forgeworks-runtime-manifest-v1"; assert type(m.get("file_count")) is int and 0<m["file_count"]<=256; assert re.fullmatch(r"[0-9a-f]{64}",m.get("sha256",""))' >/dev/null 2>&1; then
               current=1
-              echo "Hosted /versionz matches this GitHub SHA (attempt $attempt)."
+              echo "Hosted /versionz matches expected revision (attempt $attempt)."
               break
             fi
             if [[ "$attempt" != "30" ]]; then sleep 6; fi
           done
           if [[ "$current" != "1" ]]; then
-            echo "::error::Hosted staging failed to serve the GitHub triggering commit after bounded retries."
+            echo "::error::Hosted staging failed to serve the expected revision after bounded retries."
             exit 1
           fi
           status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 --connect-timeout 10 "$BASE_URL/metricsz")"
