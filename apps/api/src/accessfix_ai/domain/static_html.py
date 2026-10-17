@@ -54,7 +54,7 @@ def image_alt_findings(source: bytes) -> list[dict]:
         # Empty alt is intentional decoration only for noninteractive images;
         # image submit controls require a nonempty accessible action label.
         if "alt" in attrs and attrs["alt"] is not None and (
-            tag == "img" or attrs["alt"].strip()
+            (tag == "img" and attrs["alt"] == "") or attrs["alt"].strip()
         ):
             continue
         identifier = attrs.get("id")
