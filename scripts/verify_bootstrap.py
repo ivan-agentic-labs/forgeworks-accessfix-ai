@@ -34,7 +34,7 @@ patterns = {
 scanned = 0
 for p in root.rglob("*"):
     rel = p.relative_to(root)
-    if not p.is_file() or any(x in {".git", "__pycache__", ".venv", "node_modules", ".pytest_cache"} for x in rel.parts):
+    if not p.is_file() or any(x in {".git", "__pycache__", "node_modules", ".pytest_cache"} or x.startswith(".venv") for x in rel.parts):
         continue
     if p.name == ".env" or (p.name.startswith(".env.") and p.name != ".env.example"):
         errors.append(f"environment file: {rel}")
