@@ -1,6 +1,7 @@
 """Bounded runtime identity and request telemetry without request payloads."""
 from __future__ import annotations
 
+import sys
 import hashlib
 import hmac
 import json
@@ -186,7 +187,7 @@ def register_operations(app, root: Path, product: str) -> None:
     app.state.request_metrics = metrics
     logger = logging.getLogger("forgeworks.http")
     if not logger.handlers:
-        handler = logging.StreamHandler()
+        handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(logging.Formatter("%(message)s"))
         logger.addHandler(handler)
     logger.setLevel(logging.INFO)
